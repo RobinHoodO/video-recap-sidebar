@@ -351,7 +351,18 @@ async function fetchViaApify(): Promise<Segment[]> {
 }
 
 // Read whatever transcript segments YouTube has rendered in its own panel.
+// YouTube migrated the markup to <transcript-segment-view-model> (2026); we
+// support that first and fall back to the legacy <ytd-transcript-segment-renderer>.
 export function fetchFromOpenTranscriptPanel(): Segment[] {
+  const vm = Array.from(document.querySelectorAll("transcript-segment-view-model"));
+  if (vm.length) {
+    return vm
+      .map((el) => ({
+        tStartMs: parseTime(el.querySelector(".ytwTranscriptSegmentViewModelTimestamp")?.textContent?.trim() || "0") * 1000,
+        text: (el.querySelector(".ytAttributedStringHost")?.textContent || "").replace(/\s+/g, " ").trim(),
+      }))
+      .filter((s) => s.text);
+  }
   return Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"))
     .map((el) => ({
       tStartMs: parseTime(el.querySelector(".segment-timestamp")?.textContent?.trim() || "0") * 1000,

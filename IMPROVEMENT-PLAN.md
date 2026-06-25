@@ -25,6 +25,8 @@ Transcripts cached by videoId in `chrome.storage` → instant revisits.
 5. **Debugging technique that cracked it:** launch a throwaway debug Chrome (`--remote-debugging-port=9222 --user-data-dir=<tmp> --load-extension=dist`), then speak CDP from Node 22 (built-in `WebSocket`, zero installs) to inspect live DOM, `Page.captureScreenshot`, and test selectors against the real page. Probe scripts in session scratchpad (`cdp-probe*.mjs`). Reach for this whenever a fix depends on YouTube's live DOM — beats guessing selectors.
 
 ## DONE this session
+- **Send to Librarian** — toolbar book-icon button POSTs the full transcript (`{title,url,text}`) to the Hermes gateway webhook (`127.0.0.1:8644/webhooks/librarian-ingest`, `X-Gitlab-Token` auth) via the background worker; Hermes files it into the Thrivbe LLM wiki. Secret defaulted in `DEFAULT_SETTINGS.librarianSecret`. Verified HTTP 202.
+- **Framework focus option** — new choice next to Insightful/Funny/etc.; generates a comprehensive, exhaustive nested framework (10-20 bullets) from the video. Branch in `summaryPrompt` (`core.ts`).
 - **Per-video isolation across SPA navigation** — YouTube keeps the previous video's `ytInitialPlayerResponse` in page `<script>` tags after navigating, so timedtext was fetching/caching/recapping the WRONG video. Now validates `pr.videoDetails.videoId` against the current video before trusting tracks; skips caching if navigated mid-fetch. (Verified working.)
 - Apify fallback + timeout · transcript cache · pre-generate Summary + Timestamped on load
 - Keyboard isolation moved to shadow host (Enter sends in Ask; keys don't reach YT player)

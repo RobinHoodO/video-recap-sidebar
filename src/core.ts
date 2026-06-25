@@ -305,7 +305,11 @@ async function fetchViaInnertube(): Promise<Segment[]> {
       body: JSON.stringify({ context, params }),
     });
   } catch { return []; }
-  if (!transcriptRes.ok) return [];
+  if (!transcriptRes.ok) {
+    // ponytail: temp — surface YouTube's 400 reason so we know what it rejects
+    console.warn("[recap] get_transcript", transcriptRes.status, "| params len", params.length, "| body:", (await transcriptRes.text()).slice(0, 500));
+    return [];
+  }
 
   const transcriptJson = await readJson(transcriptRes);
   return findInitialSegments(transcriptJson)

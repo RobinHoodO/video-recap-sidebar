@@ -1,6 +1,6 @@
 # Video Recap Sidebar — Status & Learnings
 
-**Updated:** 2026-06-25 · **Trajectory:** prototype/exploring · **Repo:** private `RobinHoodO/video-recap-sidebar` · **HEAD:** `6ffa034`
+**Updated:** 2026-06-25 · **Trajectory:** prototype/exploring · **Repo:** private `RobinHoodO/video-recap-sidebar` · **HEAD:** `e218c54`
 
 ---
 
@@ -25,6 +25,7 @@ Transcripts cached by videoId in `chrome.storage` → instant revisits.
 5. **Debugging technique that cracked it:** launch a throwaway debug Chrome (`--remote-debugging-port=9222 --user-data-dir=<tmp> --load-extension=dist`), then speak CDP from Node 22 (built-in `WebSocket`, zero installs) to inspect live DOM, `Page.captureScreenshot`, and test selectors against the real page. Probe scripts in session scratchpad (`cdp-probe*.mjs`). Reach for this whenever a fix depends on YouTube's live DOM — beats guessing selectors.
 
 ## DONE this session
+- **Per-video isolation across SPA navigation** — YouTube keeps the previous video's `ytInitialPlayerResponse` in page `<script>` tags after navigating, so timedtext was fetching/caching/recapping the WRONG video. Now validates `pr.videoDetails.videoId` against the current video before trusting tracks; skips caching if navigated mid-fetch. (Verified working.)
 - Apify fallback + timeout · transcript cache · pre-generate Summary + Timestamped on load
 - Keyboard isolation moved to shadow host (Enter sends in Ask; keys don't reach YT player)
 - Inline focus/format/count dropdowns on Summary (no jump to config)
@@ -32,6 +33,7 @@ Transcripts cached by videoId in `chrome.storage` → instant revisits.
 - Single private repo, untracked from the Thrivbe-AI monorepo
 
 ## REMAINING / NEXT
+- 🟡 **Gated-video SPA carryover (residual):** if YouTube keeps the *previous* video's transcript panel open across a navigation, the panel-reader could read stale segments before YouTube refreshes them. Rare (YouTube usually closes the panel on nav). Guard `fetchViaTranscriptPanel` against this if it ever shows up.
 - 🟡 **Active-panel "close after read"** uses the old engagement-panel id (`engagement-panel-searchable-transcript`); the new "In this video" panel likely has a different target-id, so the panel may stay open after reading. Cosmetic. Update the close selector if the lingering panel annoys.
 - 🟡 **Top comments tab is demo data** — wire real (innertube `next` continuation) or drop the tab. Decision pending.
 - 🟡 **No parser tests** — `findInitialSegments`, `parseJsonLoose`, Apify mapping, the new panel reader. A ~20-line check would catch the next markup rename fast.

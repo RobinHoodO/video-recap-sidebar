@@ -24,6 +24,10 @@ export type Settings = {
 export const DEFAULT_GEMINI_PROMPT =
   "Outline the framework taught in this talk as a nested outline, then a 4-6 sentence summary. Use markdown headings.";
 
+// Build-time defaults, baked in by Vite from the gitignored .env so keys/secrets
+// survive a full "Remove + Load unpacked" (which wipes chrome.storage). Stored
+// settings still override these, so editing a value in ⚙ persists as normal.
+const ENV = import.meta.env as Record<string, string | undefined>;
 export const DEFAULT_SETTINGS: Settings = {
   focus: "Insightful",
   format: "List",
@@ -33,13 +37,12 @@ export const DEFAULT_SETTINGS: Settings = {
   grouped: true,
   provider: "openai",
   model: "gpt-4o-mini",
-  apiKey: "",
+  apiKey: ENV.VITE_OPENAI_KEY ?? "",
   language: "English",
-  apifyToken: "",
+  apifyToken: ENV.VITE_APIFY_TOKEN ?? "",
   geminiPrompt: DEFAULT_GEMINI_PROMPT,
-  // Hermes "Librarian" webhook secret — paste in settings (never commit it).
-  // From ~/.hermes/webhook_subscriptions.json → librarian-ingest.secret.
-  librarianSecret: "",
+  // Hermes "Librarian" webhook secret — from the gitignored .env, never source.
+  librarianSecret: ENV.VITE_LIBRARIAN_SECRET ?? "",
 };
 
 // Hermes gateway "Send to Librarian" webhook — ingests the page into the wiki.

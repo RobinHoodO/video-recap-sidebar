@@ -1,65 +1,39 @@
-# HANDOVER — Video Recap Sidebar
+# HANDOVER — 2026-06-25 (video-recap-sidebar + side-tasks)
 
-**Date:** 2026-06-25
-**Project:** `/Users/robinsverd/Thrivbe-AI/lab/video-recap-sidebar/`
-**Why this handover:** prior session hit ~$195 (long context replaying every turn). Continue in a fresh session.
+Session was long/expensive (~$360). Restart fresh; this carries verified facts only.
 
-## What it is
-A YouTube video-recap Chrome extension (MV3). A dark panel injects into the watch page (top of the recommendations column), fetches the transcript, and uses a BYO-key LLM to produce a configurable recap, timestamped summary, and grounded chat. Cloned from the design in `reference/Video Recap.dc.html` + `reference/uploads/*.png`.
+## PRIMARY: video-recap-sidebar (YouTube transcript-recap MV3 extension)
+- **Private repo (source of truth):** `RobinHoodO/video-recap-sidebar`, HEAD `106e518`. Untracked from the Thrivbe-AI monorepo.
+- **Path:** `/Users/robinsverd/Thrivbe-AI/lab/video-recap-sidebar`. Stack: MV3 + CRXJS + Vite + React, inline styles, shadow-DOM panel; LLM calls via background worker (BYO key: OpenAI/Anthropic/OpenRouter).
 
-## Stack
-MV3 + CRXJS + Vite + React 18, **inline styles** (ported from the mockup for pixel-fidelity — no Tailwind), Shadow-DOM isolated. LLM calls run in a **background service worker** (`src/background.ts`) so the API key never touches the page and there's no CORS.
+### What WORKS (all built + pushed)
+- **Transcript fetching SOLVED.** Tier order in `core.ts`: timedtext (non-gated) → **active panel-open** (gated, free) → Apify (paid fallback) → Innertube (dead, last-ditch). Cached by videoId in chrome.storage.
+- **KEY LEARNING:** YouTube killed `youtubei/v1/get_transcript` (Dec 2025, 100% 400 — YouTube.js #1102). The free path is reading YouTube's OWN transcript panel. YouTube renamed its markup to `<transcript-segment-view-model>` (timestamp `.ytwTranscriptSegmentViewModelTimestamp`, text `.ytAttributedStringHost`) — that rename was the whole saga; reader now supports it + legacy. *If transcripts break again, suspect a markup rename — inspect live DOM via CDP (see below).*
+- **Per-video isolation** across SPA nav (validates `pr.videoDetails.videoId`; no cache poisoning).
+- **Send to Librarian** button (toolbar book icon) → POSTs full transcript to Hermes webhook `127.0.0.1:8644/webhooks/librarian-ingest` (X-Gitlab-Token auth) via background worker. Verified HTTP 202.
+- **Framework focus option** (next to Insightful/Funny/etc.) → comprehensive 10-20-bullet framework.
+- Keyboard isolation (Enter sends; keys don't reach YT player), inline focus/format/count dropdowns, configurable Gemini prompt, pre-gen Summary+Timestamped.
 
-## Locked decisions
-- v1 = working end-to-end with real LLM. No auth, no payments.
-- **BYO key**, stored in `chrome.storage.local.settings`. Providers: **OpenAI, Anthropic, OpenRouter** (OpenRouter = any model id).
-- In-page content-script panel (NOT the native side_panel) — matches the mockup.
+### SESSION 2 (2026-06-25, HEAD `80a2027`) — done this session
+- **SW wake-race fixed** — `sendToWorker()` in core.ts retries `chrome.runtime.sendMessage` on the MV3 wake-race (no keepalive). Fixed dropped LLM/Librarian calls on new videos.
+- **Comments wired** — `readPageComments()` reads YouTube's rendered `ytd-comment-thread-renderer` (zero-key); demo data gone. Scroll-to-load + ↻ Refresh hint. Selectors `#author-text`/`#content-text`/`#vote-count-middle` (markup-rename risk).
+- **Librarian 401 SOLVED** — root cause was **Remove+Load wiping chrome.storage**, so the secret was re-typed (with whitespace) each reload. Fix: secrets/keys now **baked at build time from a gitignored `.env`** (seeded from `Thrivbe-AI/.env`) → survive reload, byte-exact. Confirmed working (HTTP 202). `.env` + `dist/` gitignored. Trim safety net also added.
+- **Secret scrubbed from git history** — `git filter-repo` replaced `BP1HyMa2…`→`***REMOVED***`, force-pushed. Backup bundle in session scratchpad.
+- **LEARNINGS.md added** (committed) + memory pointer `video-recap-learnings` — transferable MV3/scraping/CDP/cost learnings.
 
-## Status — what WORKS (build + typecheck green)
-- Full pixel-perfect UI: 5 views (Summary / Timestamped / Ask / Comments / Transcript) + settings overlay + toast. Capped to video height, pinned to top, Shadow-DOM isolated.
-- Settings persisted; provider/model/key UI; Focus/Format/Length/emoji/highlights/language feed the prompt.
-- LLM: Summary, Timestamped, grounded Ask — all from the real transcript, via the service worker.
-- Click-a-timestamp seeks the video.
-- Render hardened: malformed LLM JSON shows a friendly error instead of crashing (two prior crashes fixed: null `data.heading`, missing `bullets/items`).
+### TODO / open
+1. **ROTATE the Hermes librarian secret** (still the original value, baked but unrotated). Update 3 places: `~/.hermes/webhook_subscriptions.json`, `~/.hermes/config.yaml:650`, extension `.env` → rebuild. Then `launchctl kickstart -k gui/$(id -u)/ai.hermes.gateway`.
+2. **Wiki ingest of LEARNINGS.md** — proposed nodes: concepts/cdp-live-dom-debugging, concepts/mv3-extension-patterns, concepts/scraping-tiered-fallback, entities/youtube-transcript-extraction, sources/2026-06-25-video-recap-learnings.
+3. Anthropic provider uses the baked OpenAI key by default (single apiKey field) — switch in ⚙ once, persists.
+4. Parser tests missing; residual gated-panel SPA carryover; active-panel close uses old engagement-panel id.
+- Delete junk wiki note "VRS connectivity test — ignore/delete" (from an auth curl).
+- Full detail in `IMPROVEMENT-PLAN.md` (in repo).
 
-## Status — the OPEN problem: transcript fetching on gated videos
-YouTube now gates the `timedtext` caption endpoint behind a **PoToken** (returns empty 200s). Current `src/core.ts` `fetchTranscript()` tries, in order:
-1. **Innertube `next` → `get_transcript`** (same-origin, no PoToken). Just added: fetches the transcript `params` from `youtubei/v1/next` when the page doesn't embed them. **← needs real-video testing; may already fix gated videos for free.**
-2. timedtext `json3`
-3. timedtext XML
-4. **passive** scrape of YouTube's own transcript panel — only if the user has it open. A MutationObserver (`watchForTranscriptPanel` in `src/content.tsx`) auto-loads it into our panel the moment "Show transcript" is opened.
+### CDP debug technique (reusable)
+Launch debug Chrome: `--remote-debugging-port=9222 --user-data-dir=<tmp> --load-extension=dist`, then speak CDP from Node 22 (built-in WebSocket, zero installs) to inspect live DOM / `Page.captureScreenshot` / test selectors. Probe scripts in session scratchpad `cdp-probe*.mjs`. The screenshot is what cracked the markup-rename bug.
 
-Test video that was failing: `https://www.youtube.com/watch?v=wjnWnAvQ43Y`
+## SIDE-TASK A: sandcastle taught into the system
+`@ai-hero/sandcastle` (Matt Pocock) — isolated-sandbox agent orchestration (Docker/Podman/Vercel) + auto git worktrees. Added to: coding-strategist catalog (`~/.claude/skills/coding-strategist/references/framework-catalog.md`), `Thrivbe-AI/CODING-FRAMEWORK-MAP.md`, global `~/.claude/rules/common/agents.md`.
 
-## NEXT TASKS (priority order)
-1. **TEST the Innertube `/next` fix** on `wjnWnAvQ43Y` (reload extension → open panel). If the transcript auto-loads, the core problem is solved free.
-2. **If still flaky → wire Apify fallback** (researched, recommended):
-   - Actor: **`supreme_coder/youtube-transcript-scraper`** (~$0.30/1k; Apify's $5/mo free credit ≈ ~16k transcripts/mo; actively maintained through YT's Dec'25/Jan'26 changes via residential proxies).
-   - Call from content script: `POST https://api.apify.com/v2/acts/supreme_coder~youtube-transcript-scraper/run-sync-get-dataset-items?token=<APIFY_TOKEN>` (CORS-OK; run-sync fine, ~5–30s cold start → show loading).
-   - Add `"https://api.apify.com/*"` to `host_permissions` (manifest in `vite.config.ts`); add an Apify token field to settings (BYO).
-   - Insert as tier between Innertube and the passive scrape.
-3. **Comments tab** is still demo data — wire to real comments later (needs YT comment API) or drop the tab.
-4. Pixel-QA the panel against `reference/` on a real video.
-
-## Run / load
-```
-cd /Users/robinsverd/Thrivbe-AI/lab/video-recap-sidebar
-npm install            # if fresh
-npm run build          # or: npm run dev  (HMR)
-# chrome://extensions → Developer mode → Load unpacked → select dist/
-# Open a youtube.com/watch video → ⚙ → pick provider, paste API key
-```
-After ANY manifest change: remove the extension and re-add (a plain reload can wedge). Confirm you're on the latest build (check the hashed filename in any error isn't an old one).
-
-## Key files
-- `src/core.ts` — transcript fetch (4 tiers) + LLM types/prompts/provider calls (OpenAI/Anthropic/OpenRouter).
-- `src/background.ts` — service worker; reads settings, calls the LLM.
-- `src/Panel.tsx` — the UI (~380 lines), wired to transcript + LLM, hardened renders.
-- `src/content.tsx` — injects panel, fetches transcript, SPA-nav handling, transcript-panel MutationObserver.
-- `vite.config.ts` — MV3 manifest (permissions: storage; host_permissions: openai/anthropic/openrouter).
-- `reference/` — design mockup + screenshots. `PROJECT-APPROACH.md` — the plan.
-- `spike/` — early transcript spike (superseded by core.ts).
-
-## Notes
-- JSON mode works best on OpenAI `gpt-4o-mini`/`gpt-4o`; on OpenRouter pick a model that supports structured output.
-- Research detail (PoToken, Innertube, Apify, Supadata comparison) was gathered this session — summarized in the priority tasks above.
+## SIDE-TASK B: wiki ingest
+`CODING-FRAMEWORK-MAP.md` organized into the LLM wiki: created `concepts/coding-framework-stack`, `entities/sandcastle`, `sources/2026-06-25-coding-framework-map`; index ×3 + log updated; raw snapshot saved. **Lint follow-up:** fill red links ([[coding-strategist]], [[ponytail]], [[gitnexus]], [[codex]]); back-relink from [[claude-code-workflow]]/[[matt-pocock]]; refresh `hot.md`.

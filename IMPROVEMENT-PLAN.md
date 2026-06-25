@@ -1,72 +1,52 @@
-# Video Recap Sidebar — Improvement Plan & Handoff
+# Video Recap Sidebar — Status & Learnings
 
-**Date:** 2026-06-25 · **Trajectory:** prototype/exploring · **Rigor:** ship-fast, ponytail-hard
-**Last commit:** `d73e1e5b` (Apify fallback, caching, keyboard fix, configurable Gemini prompt)
-
----
-
-## Strategist route (prototype-trimmed `/gsd-quick` + ponytail)
-
-Brownfield · UI + AI/LLM · solo · fast. **No** full GSD lifecycle, **no** secure/validate/TDD ceremony — revisit only if trajectory flips to Chrome Web Store.
-
-| Phase | Tool | Status |
-|-------|------|--------|
-| AUDIT | `/improve` + `/ponytail-review` | condensed audit below |
-| PLAN per item | `/gsd-quick <feature>` (else inline) | — |
-| IMPLEMENT | ponytail + `ecc:react-reviewer` on diff | in progress |
-| REVIEW | `/code-review` on the diff | pending |
-| SHIP | `/github-flow` (or scoped commit) | first commit done |
-| LEARN | `/handoff` | this doc |
-
-Cross-cutting: ponytail (on) · claude-mem · codex (Innertube spike, see below).
+**Updated:** 2026-06-25 · **Trajectory:** prototype/exploring · **Repo:** private `RobinHoodO/video-recap-sidebar` · **HEAD:** `6ffa034`
 
 ---
+
+## ✅ STATUS: transcript fetching SOLVED
+
+Gated videos load **free + automatically** by driving YouTube's own transcript panel. Verified working across videos.
+
+**Tier order in `fetchTranscript` (`core.ts`):**
+1. **timedtext** caption tracks — instant/free, works on non-gated videos.
+2. **Active transcript panel** — expand description → click "Show transcript" → read rendered segments → close. Free, works on gated videos (YouTube's UI carries the PoToken). **This is the primary path for gated videos.**
+3. **Apify** (`supreme_coder~youtube-transcript-scraper`, BYO token, 45s timeout) — reliable paid fallback, ~11s.
+4. **Innertube `get_transcript`** — last-ditch; effectively dead (see learnings).
+
+Transcripts cached by videoId in `chrome.storage` → instant revisits.
+
+## 🔑 KEY LEARNINGS (the hard-won ones — don't relearn these)
+
+1. **`youtubei/v1/get_transcript` is dead (Dec 2025).** YouTube's new bot-detection returns **400 to ~100% of automated calls** — confirmed in YouTube.js issue #1102 by its own maintainers. No context/header/params/auth fix gets around it. Our Codex-built "correct" implementation was correct; the endpoint just refuses. Don't sink more time into it.
+2. **timedtext CDN is PoToken-gated** → empty 200s on gated videos. Works only for non-gated.
+3. **The only free path for gated videos = YouTube's own transcript panel.** Its UI already solved PoToken, so reading its rendered DOM is the reliable free route. We open it programmatically, read, close.
+4. **YouTube migrated transcript markup (2026):** `<ytd-transcript-segment-renderer>` → **`<transcript-segment-view-model>`** (timestamp `.ytwTranscriptSegmentViewModelTimestamp`, text `.ytAttributedStringHost`). This single rename caused the whole "panel won't load" saga — the click worked all along; our *reader* returned 0. `fetchFromOpenTranscriptPanel` now reads new markup first, legacy as fallback. **If transcripts break again, suspect a markup rename first.**
+5. **Debugging technique that cracked it:** launch a throwaway debug Chrome (`--remote-debugging-port=9222 --user-data-dir=<tmp> --load-extension=dist`), then speak CDP from Node 22 (built-in `WebSocket`, zero installs) to inspect live DOM, `Page.captureScreenshot`, and test selectors against the real page. Probe scripts in session scratchpad (`cdp-probe*.mjs`). Reach for this whenever a fix depends on YouTube's live DOM — beats guessing selectors.
 
 ## DONE this session
-- **Apify transcript fallback** (`supreme_coder~youtube-transcript-scraper`, BYO token, 45s timeout) — gated videos now work. Tier order: Innertube → timedtext → **Apify** → passive panel.
-- **Transcript cache** by videoId in `chrome.storage` — revisits instant, skip Apify.
-- **Pre-generate** Summary + Timestamped on load — instant tab switching.
-- **Keyboard fix** — panel keystrokes no longer drive YouTube's player (space/k/j/arrows).
-- **Inline dropdowns** for focus/format/count on Summary (no jump to config).
-- **Configurable Gemini prompt** (settings → GEMINI PROMPT); full transcript already sent.
-- Removed Ask "BETA" badge. Scoped `update()` so token/prompt edits don't trigger regen.
+- Apify fallback + timeout · transcript cache · pre-generate Summary + Timestamped on load
+- Keyboard isolation moved to shadow host (Enter sends in Ask; keys don't reach YT player)
+- Inline focus/format/count dropdowns on Summary (no jump to config)
+- Configurable Gemini prompt (full transcript already sent) · removed BETA badge
+- Single private repo, untracked from the Thrivbe-AI monorepo
 
-## OPEN — transcript fetch speed (the priority)
-Two separate costs:
-1. **Repeat visits** → FIXED by cache (instant).
-2. **First visit of a gated video** → ~11s, almost all **Apify cold-start**.
-
-Levers, ranked:
-- **B (the prize): fix the Innertube tier.** It returns **HTTP 400** even with params decoded. If fixed → first fetch ~0.5s **and free**, Apify becomes rarely-hit. **→ Codex spike was dispatched this session** (background agent). **Check its output and apply its recommended `fetchViaInnertube`.** Likely cause per the brief: WEB `context` missing `visitorData`/`hl`/`gl`, or must use `/next`-returned params + SAPISIDHASH auth headers.
-- **C (fallback if B dies):** swap Apify for a warm API (Supadata / youtube-transcript.io) → ~2s, no cold start.
-- **D:** race Apify in parallel with in-page tiers — only shaves 1–3s, spends credits every video. Skip unless needed.
-
-## REMAINING DEBT
-- 🔴 **`[recap]` console breadcrumbs still inside `fetchViaInnertube`** (`core.ts` ~155–205) — left intentionally because Codex's spike will replace the whole function. If you DON'T take Codex's version, strip them.
-- 🟡 **No parser tests** — `decodeJsonStr`, `findInitialSegments`, `parseJsonLoose`, Apify mapping. Add one ~20-line `test_parsers` (ponytail: money/parser paths leave one check behind).
-- 🟡 **Pre-gen fires 2 LLM calls per video automatically** — fine for BYO key, but consider gating Timestamped behind first-open if cost matters.
-
-## ROADMAP (where to take it)
-- Reliability: land Innertube fix (B) · cache (done) · Apify timeout (done).
-- Features: real **Top comments** (currently demo data — innertube `next` continuation) OR drop the tab · transcript language picker · keyboard shortcut to open panel.
-- Polish: loading skeletons · better error states.
-
-## DECISIONS PENDING (yours)
-- **Top comments:** wire real / drop tab / leave demo.
-- **Innertube:** if Codex can't crack the 400 → adopt warm-API (C)?
-
----
+## REMAINING / NEXT
+- 🟡 **Active-panel "close after read"** uses the old engagement-panel id (`engagement-panel-searchable-transcript`); the new "In this video" panel likely has a different target-id, so the panel may stay open after reading. Cosmetic. Update the close selector if the lingering panel annoys.
+- 🟡 **Top comments tab is demo data** — wire real (innertube `next` continuation) or drop the tab. Decision pending.
+- 🟡 **No parser tests** — `findInitialSegments`, `parseJsonLoose`, Apify mapping, the new panel reader. A ~20-line check would catch the next markup rename fast.
+- 🟢 Pre-gen fires 2 LLM calls/video automatically — fine for BYO key; gate Timestamped behind first-open if cost matters.
 
 ## Run / load
 ```
 cd /Users/robinsverd/Thrivbe-AI/lab/video-recap-sidebar
 npm run build
-# chrome://extensions → Remove → Load unpacked → dist/   (full re-add: Apify host_permission)
-# ⚙ → paste OpenAI/Anthropic/OpenRouter key + Apify token (in .env as APIFY_TOKEN)
+# chrome://extensions → reload (full re-add only after a manifest change)
+# ⚙ → AI key (OpenAI/Anthropic/OpenRouter). Apify token optional (gated-video paid fallback).
 ```
 
 ## Key files
-- `src/core.ts` — transcript tiers (+ cache, + Apify) + LLM types/prompts/providers.
-- `src/content.tsx` — panel injection, throttled transcript-panel observer, SPA nav.
-- `src/Panel.tsx` — UI; pre-gen, inline dropdowns, keyboard-isolation, Gemini prompt.
+- `src/core.ts` — transcript tiers (timedtext → active panel → Apify → Innertube) + cache + LLM providers.
+- `src/content.tsx` — panel injection, shadow-host keyboard isolation, transcript-panel observer, SPA nav.
+- `src/Panel.tsx` — UI: pre-gen, inline dropdowns, Gemini prompt, settings.
 - `vite.config.ts` — MV3 manifest (host_permissions incl. api.apify.com).

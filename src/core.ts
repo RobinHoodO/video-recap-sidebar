@@ -305,11 +305,7 @@ async function fetchViaInnertube(): Promise<Segment[]> {
       body: JSON.stringify({ context, params }),
     });
   } catch { return []; }
-  if (!transcriptRes.ok) {
-    // ponytail: temp — surface YouTube's 400 reason so we know what it rejects
-    console.warn("[recap] get_transcript", transcriptRes.status, "| params len", params.length, "| body:", (await transcriptRes.text()).slice(0, 500));
-    return [];
-  }
+  if (!transcriptRes.ok) return [];
 
   const transcriptJson = await readJson(transcriptRes);
   return findInitialSegments(transcriptJson)
@@ -354,9 +350,7 @@ async function fetchViaApify(): Promise<Segment[]> {
     .filter((s: Segment) => s.text);
 }
 
-// Tier 4 (passive): if the user ALREADY has YouTube's transcript panel open,
-// read it. We never open/click it ourselves — that would hijack the visible
-// YouTube UI (which it previously did, by mistake).
+// Read whatever transcript segments YouTube has rendered in its own panel.
 export function fetchFromOpenTranscriptPanel(): Segment[] {
   return Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"))
     .map((el) => ({
@@ -364,6 +358,45 @@ export function fetchFromOpenTranscriptPanel(): Segment[] {
       text: (el.querySelector(".segment-text")?.textContent || "").replace(/\s+/g, " ").trim(),
     }))
     .filter((s) => s.text);
+}
+
+const TRANSCRIPT_PANEL_SEL =
+  'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
+
+// Free path that survives PoToken gating: drive YouTube's OWN "Show transcript"
+// panel. Its UI already holds the PoToken, so the rendered segments are the
+// real transcript even when every API tier is blocked (get_transcript is 100%
+// 400 since Dec 2025 — YouTube.js #1102). We open the panel, read it, and close
+// it again (if we opened it) to leave the page as we found it.
+async function fetchViaTranscriptPanel(): Promise<Segment[]> {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // Already open? Just read it.
+  let segs = fetchFromOpenTranscriptPanel();
+  if (segs.length) return segs;
+
+  const findBtn = (): HTMLElement | null =>
+    (document.querySelector('button[aria-label="Show transcript" i]') as HTMLElement | null) ||
+    (document.querySelector("ytd-video-description-transcript-section-renderer button") as HTMLElement | null);
+
+  let btn = findBtn();
+  if (!btn) {
+    // The button lives at the bottom of the description — expand it first.
+    (document.querySelector("ytd-text-inline-expander #expand, tp-yt-paper-button#expand") as HTMLElement | null)?.click();
+    for (let i = 0; i < 12 && !btn; i++) { await wait(150); btn = findBtn(); }
+  }
+  if (!btn) return [];
+
+  const wasOpen = !!document.querySelector(`${TRANSCRIPT_PANEL_SEL}[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]`);
+  btn.click();
+
+  for (let i = 0; i < 30 && !segs.length; i++) { await wait(150); segs = fetchFromOpenTranscriptPanel(); }
+
+  // Close the panel again only if we were the ones who opened it.
+  if (segs.length && !wasOpen) {
+    (document.querySelector(`${TRANSCRIPT_PANEL_SEL} #visibility-button button, ${TRANSCRIPT_PANEL_SEL} button[aria-label="Close" i]`) as HTMLElement | null)?.click();
+  }
+  return segs;
 }
 
 // Cache successful transcripts by video id so revisits are instant and skip the
@@ -385,13 +418,9 @@ export async function fetchTranscript(): Promise<Segment[]> {
 }
 
 async function fetchTranscriptUncached(): Promise<Segment[]> {
-  // Tier 1 (best, free): Innertube get_transcript — same-origin, no PoToken.
-  const inner = await fetchViaInnertube();
-  if (inner.length) return inner;
-
+  // Tier 1 (free, instant): caption-track timedtext — works on non-gated videos.
   const pr = readPlayerResponse();
   const tracks: any[] = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
-  // Tier 2+3: caption track json3, then XML. English first, then any track.
   const ordered = [...tracks].sort((a, b) =>
     Number(b.languageCode?.startsWith("en")) - Number(a.languageCode?.startsWith("en"))
   );
@@ -400,17 +429,23 @@ async function fetchTranscriptUncached(): Promise<Segment[]> {
     const segs = await fetchTrack(track.baseUrl);
     if (segs.length) return segs;
   }
-  // Tier 3.5 (paid, BYO token): Apify scraper — handles gated videos.
+
+  // Tier 2 (free, gated-safe): drive YouTube's own transcript panel.
+  const panel = await fetchViaTranscriptPanel();
+  if (panel.length) return panel;
+
+  // Tier 3 (paid, BYO token): Apify scraper.
   const viaApify = await fetchViaApify();
   if (viaApify.length) return viaApify;
 
-  // Tier 4 (passive): read the transcript panel only if already open.
-  const panel = fetchFromOpenTranscriptPanel();
-  if (panel.length) return panel;
+  // Tier 4 (last-ditch): Innertube get_transcript — 100% blocked since Dec 2025
+  // (YouTube.js #1102), but occasionally slips through, so try it last.
+  const inner = await fetchViaInnertube();
+  if (inner.length) return inner;
 
   throw new Error(
     tracks.length
-      ? "Captions are restricted for this video. Click “Show transcript” under the video — it'll load here automatically."
+      ? "Couldn't load this transcript automatically. Open “Show transcript” under the video and it'll appear here."
       : "This video has no transcript available."
   );
 }

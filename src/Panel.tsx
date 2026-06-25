@@ -89,7 +89,6 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState("");
   const toastTimer = useRef<number | undefined>(undefined);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   const closed = !settingsOpen;
   const hasKey = !!settings.apiKey;
@@ -103,18 +102,6 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
       setSettingsLoaded(true);
       if (!got.settings) chrome.storage.local.set({ settings: merged });
     });
-  }, []);
-
-  // Keyboard events from our inputs are `composed` and bubble out of the shadow
-  // DOM to YouTube's document-level handlers (space/k/j/arrows = video commands).
-  // Stop them at the panel root so typing here never controls the video.
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    const evs = ["keydown", "keyup", "keypress"] as const;
-    evs.forEach((ev) => el.addEventListener(ev, stop));
-    return () => evs.forEach((ev) => el.removeEventListener(ev, stop));
   }, []);
 
   async function askLLM(kind: "summary" | "timestamped" | "ask", question = ""): Promise<LlmResponse> {
@@ -205,7 +192,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   const features: { k: keyof Settings; l: string }[] = [{ k: "emojis", l: "Add emojis" }, { k: "highlights", l: "Highlights" }, { k: "grouped", l: "Grouped" }];
 
   return (
-    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", maxHeight: "var(--vrs-max, 80vh)", minHeight: 0, background: "#0a0a0a", border: "1px solid #2a2a2a", borderRadius: 16, overflow: "hidden", position: "relative", boxShadow: "0 14px 50px rgba(0,0,0,.6)", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
+    <div style={{ display: "flex", flexDirection: "column", maxHeight: "var(--vrs-max, 80vh)", minHeight: 0, background: "#0a0a0a", border: "1px solid #2a2a2a", borderRadius: 16, overflow: "hidden", position: "relative", boxShadow: "0 14px 50px rgba(0,0,0,.6)", fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif", WebkitFontSmoothing: "antialiased" }}>
       {/* toolbar */}
       <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 2, background: "#181818", border: "1px solid #2b2b2b", borderRadius: 13, padding: 4 }}>

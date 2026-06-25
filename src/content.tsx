@@ -44,6 +44,13 @@ function ensureMounted(): boolean {
   const host = document.createElement("div");
   host.id = HOST_ID;
   host.style.cssText = "display:block;margin-bottom:16px;";
+  // Keyboard events from our inputs are `composed` and bubble to YouTube's
+  // document handlers (space/k/j/arrows = video commands). Stop them at the
+  // host — above the React root, so the panel's own key handlers (Enter to
+  // send) still fire, but nothing leaks to the player.
+  ["keydown", "keyup", "keypress"].forEach((ev) =>
+    host.addEventListener(ev, (e) => e.stopPropagation())
+  );
   const shadow = host.attachShadow({ mode: "open" });
 
   const style = document.createElement("style");

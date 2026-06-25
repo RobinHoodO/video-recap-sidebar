@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0f0f0f; }
+      body { display: flex; justify-content: flex-end; }
+      /* Mimic YouTube's recommendations column width + the extension's host wrapper. */
+      #col { width: 402px; height: 100vh; padding: 14px; box-sizing: border-box; }
+      #root { height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="col"><div id="root"></div></div>
+    <script type="module" src="/src/preview.tsx"></script>
+  </body>
+</html>

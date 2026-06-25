@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Transcript Spike",
+  "version": "0.0.1",
+  "description": "Phase 1 spike: prove a content script can extract the YouTube transcript.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/watch*"],
+      "js": ["transcript-spike.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ]
+}

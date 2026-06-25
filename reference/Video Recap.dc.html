@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:#2e2e2e;border-radius:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+@keyframes rcpBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@keyframes rcpToast{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%)}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;width:100%;background:#0f0f0f;overflow:hidden;">
+
+  <sc-if value="{{ showPage }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;height:100%;overflow:hidden;">
+    <div style="height:56px;flex:none;display:flex;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid #232323;">
+      <div style="display:flex;flex-direction:column;gap:4px;width:18px;">
+        <span style="height:1.5px;background:#aaa;"></span><span style="height:1.5px;background:#aaa;"></span><span style="height:1.5px;background:#aaa;"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div style="width:30px;height:21px;background:#e02f2f;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+          <div style="width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:8px solid #fff;margin-left:2px;"></div>
+        </div>
+        <span style="color:#f1f1f1;font-size:19px;font-weight:600;letter-spacing:-.5px;">StreamTube</span>
+      </div>
+      <div style="flex:1;max-width:520px;margin:0 auto;display:flex;height:38px;">
+        <div style="flex:1;display:flex;align-items:center;padding:0 16px;background:#121212;border:1px solid #303030;border-radius:19px 0 0 19px;color:#777;font-size:15px;">Search</div>
+        <div style="width:60px;display:flex;align-items:center;justify-content:center;background:#222;border:1px solid #303030;border-left:none;border-radius:0 19px 19px 0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#4a8cff,#9b5cf0);"></div>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:24px 28px;">
+      <div style="max-width:1180px;margin:0 auto;">
+        <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:repeating-linear-gradient(135deg,#171717,#171717 14px,#1d1d1d 14px,#1d1d1d 28px);display:flex;align-items:center;justify-content:center;">
+          <div style="width:74px;height:74px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">
+            <div style="width:0;height:0;border-top:13px solid transparent;border-bottom:13px solid transparent;border-left:21px solid rgba(255,255,255,.85);margin-left:5px;"></div>
+          </div>
+          <span style="position:absolute;bottom:14px;right:16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#666;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:5px;">video player · 1280×720</span>
+        </div>
+        <h1 style="color:#f1f1f1;font-size:21px;font-weight:700;margin:18px 0 8px;letter-spacing:-.3px;">Full Walkthrough: Workflow for AI Coding — Matt Pocock</h1>
+        <div style="color:#9a9a9a;font-size:14px;margin-bottom:18px;">1,040,563 views · Apr 24, 2026</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#23c483,#0f8a5f);flex:none;"></div>
+          <div style="margin-right:auto;">
+            <div style="color:#f1f1f1;font-size:16px;font-weight:600;">AI Engineer</div>
+            <div style="color:#8a8a8a;font-size:13px;">6.1K subscribers</div>
+          </div>
+          <div style="padding:10px 18px;background:#f1f1f1;color:#0f0f0f;border-radius:20px;font-size:14px;font-weight:600;">Subscribe</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#222;border-radius:20px;color:#e8e8e8;font-size:14px;font-weight:600;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 2 2v3h5.6a2 2 0 0 1 2 2.3l-1.4 8a2 2 0 0 1-2 1.7H7"/></svg>
+            21K
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#222;border-radius:20px;color:#e8e8e8;font-size:14px;font-weight:600;">Share</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#222;border-radius:20px;color:#e8e8e8;font-size:14px;font-weight:600;">Save</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ EXTENSION PANEL ============ -->
+  <div style="width:472px;flex:none;height:100%;padding:14px 14px 14px 0;display:flex;">
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:16px;overflow:hidden;box-shadow:0 14px 50px rgba(0,0,0,.6);">
+
+      <!-- toolbar -->
+      <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 14px 12px;">
+        <div style="display:flex;align-items:center;gap:2px;background:#181818;border:1px solid #2b2b2b;border-radius:13px;padding:4px;">
+          <div style="{{ gemStyle }}" onClick="{{ setSummary }}">
+            <svg width="20" height="20" viewBox="0 0 24 24"><defs><linearGradient id="rcpGem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9bff"/><stop offset="1" stop-color="#b06cff"/></linearGradient></defs><path d="M6 3h12l3 6-9 12L3 9z" fill="url(#rcpGem)"/><path d="M3 9h18M9 3l-1 6 4 12M15 3l1 6-4 12" stroke="rgba(255,255,255,.25)" stroke-width="1" fill="none"/></svg>
+          </div>
+          <span style="width:1px;height:16px;background:#2f2f2f;"></span>
+          <div style="{{ listStyle }}" onClick="{{ setTimestamped }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>
+          </div>
+          <span style="width:1px;height:16px;background:#2f2f2f;"></span>
+          <div style="{{ askStyle }}" onClick="{{ setAsk }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><line x1="12" y1="4.5" x2="12" y2="8"/><circle cx="12" cy="3.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="13.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="13.5" r="1.3" fill="currentColor" stroke="none"/><line x1="2" y1="12" x2="2" y2="15"/><line x1="22" y1="12" x2="22" y2="15"/></svg>
+          </div>
+          <span style="width:1px;height:16px;background:#2f2f2f;"></span>
+          <div style="{{ comStyle }}" onClick="{{ setComments }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <span style="width:1px;height:16px;background:#2f2f2f;"></span>
+          <div style="{{ ccStyle }}" onClick="{{ setTranscript }}">
+            <span style="font-size:12px;font-weight:800;letter-spacing:.5px;border:1.6px solid currentColor;border-radius:5px;padding:2px 4px;line-height:1;">cc</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:#9a9a9a;" style-hover="background:#1f1f1f;color:#ddd;" onClick="{{ onCopy }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </div>
+          <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:#9a9a9a;" style-hover="background:#1f1f1f;color:#ddd;" onClick="{{ onShare }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
+          </div>
+          <sc-if value="{{ settingsClosed }}" hint-placeholder-val="{{ true }}">
+            <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:#9a9a9a;" style-hover="background:#1f1f1f;color:#ddd;" onClick="{{ toggleSettings }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><circle cx="9" cy="7" r="2.3" fill="#0a0a0a"/><line x1="3" y1="13.5" x2="21" y2="13.5"/><circle cx="15" cy="13.5" r="2.3" fill="#0a0a0a"/><line x1="3" y1="20" x2="21" y2="20"/><circle cx="7" cy="20" r="2.3" fill="#0a0a0a"/></svg>
+            </div>
+          </sc-if>
+          <sc-if value="{{ settingsOpen }}">
+            <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:#ddd;background:#2a2a2a;" onClick="{{ toggleSettings }}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+            </div>
+          </sc-if>
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#4a8cff,#9b5cf0);flex:none;margin-left:4px;"></div>
+        </div>
+      </div>
+
+      <!-- content -->
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+
+        <!-- SETTINGS -->
+        <sc-if value="{{ settingsOpen }}">
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:6px 22px 26px;">
+            <div style="color:#7d7d7d;font-size:13px;font-weight:600;letter-spacing:1.2px;margin:14px 0 12px;">FOCUS</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <sc-for list="{{ focusOpts }}" as="o" hint-placeholder-count="4"><div style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</div></sc-for>
+            </div>
+            <div style="color:#7d7d7d;font-size:13px;font-weight:600;letter-spacing:1.2px;margin:26px 0 12px;">FORMAT</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <sc-for list="{{ formatOpts }}" as="o" hint-placeholder-count="2"><div style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</div></sc-for>
+            </div>
+            <div style="color:#7d7d7d;font-size:13px;font-weight:600;letter-spacing:1.2px;margin:26px 0 12px;">NUMBER OF ITEMS</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <sc-for list="{{ countOpts }}" as="o" hint-placeholder-count="3"><div style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</div></sc-for>
+            </div>
+            <div style="color:#7d7d7d;font-size:13px;font-weight:600;letter-spacing:1.2px;margin:26px 0 14px;">FEATURES</div>
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <sc-for list="{{ featureItems }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:14px;cursor:pointer;" onClick="{{ f.onClick }}">
+                  <div style="{{ f.trackStyle }}"><div style="{{ f.knobStyle }}"></div></div>
+                  <span style="color:#e8e8e8;font-size:17px;">{{ f.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="color:#7d7d7d;font-size:13px;font-weight:600;letter-spacing:1.2px;margin:26px 0 12px;">LANGUAGE</div>
+            <div style="display:inline-flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid #2c2c2c;border-radius:9px;color:#e8e8e8;font-size:16px;">
+              <span style="color:#8a8a8a;font-weight:600;">EN</span> English
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- SUMMARY -->
+        <sc-if value="{{ showSummary }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 22px 26px;">
+            <div style="display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 13px;background:#1a1a1a;border:1px solid #2f2f2f;border-radius:19px;color:#d4d4d4;font-size:14.5px;cursor:pointer;" onClick="{{ toggleSettings }}">{{ settings.focus }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 13px;background:#1a1a1a;border:1px solid #2f2f2f;border-radius:19px;color:#d4d4d4;font-size:14.5px;cursor:pointer;" onClick="{{ toggleSettings }}">{{ settings.format }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 13px;background:#1a1a1a;border:1px solid #2f2f2f;border-radius:19px;color:#d4d4d4;font-size:14.5px;cursor:pointer;" onClick="{{ toggleSettings }}">{{ settings.count }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></div>
+            </div>
+            <h2 style="color:#ededed;font-size:21px;font-weight:700;margin:0 0 16px;letter-spacing:-.3px;">Context Management &amp; Token Economics</h2>
+            <div style="display:flex;flex-direction:column;gap:16px;font-size:16.5px;line-height:1.55;color:#cccccc;">
+              <div style="display:flex;gap:11px;"><span style="font-size:18px;line-height:1.4;flex:none;">🧠</span><div>LLMs have a <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">smart zone</span> at conversation start and a <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">dumb zone</span> beyond <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">100k tokens</span> where they make stupid decisions, requiring tasks sized to fit the smart zone like <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">Martin Fowler's Refactoring</span> and <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">The Pragmatic Programmer</span> principles.</div></div>
+              <div style="display:flex;gap:11px;"><span style="font-size:18px;line-height:1.4;flex:none;">📊</span><div><span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">Grilling sessions</span> with AI produce <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">25k+ tokens</span> of valuable design concept data that should be summarized into a <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">Product Requirements Document (PRD)</span> detailing problem, solution, user stories, implementation, and testing decisions.</div></div>
+              <div style="display:flex;gap:11px;"><span style="font-size:18px;line-height:1.4;flex:none;">🔄</span><div><span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">Compact</span> summarizes session history to reduce token usage, but <span style="background:rgba(150,110,45,.34);color:#f1e3c6;border-radius:3px;padding:0 3px;">clearing context</span> to reset to system prompt is preferred for <span style="color:#8a8a8a;">maintaining <span style="background:rgba(120,100,60,.3);color:#b9a87f;border-radius:3px;padding:0 3px;">consistent state</span> across sessions.</span></div></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- TIMESTAMPED -->
+        <sc-if value="{{ showTimestamped }}">
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 22px 26px;">
+            <h2 style="color:#f4f4f4;font-size:34px;font-weight:800;margin:8px 0 14px;letter-spacing:-1px;">Timestamped summary</h2>
+            <p style="color:#e4e4e4;font-size:19px;font-weight:600;line-height:1.45;margin:0 0 24px;">Software engineering fundamentals remain essential in the AI era, and effective AI coding requires a structured workflow that combines human-AI collaboration, careful planning, and control to produce high-quality codebases.</p>
+            <div style="display:flex;flex-direction:column;gap:20px;">
+              <sc-for list="{{ tsItems }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex;gap:11px;">
+                  <span style="font-size:18px;line-height:1.4;flex:none;">🤖</span>
+                  <div style="font-size:16.5px;line-height:1.55;color:#cfcfcf;"><span style="color:#4a9eef;font-weight:600;cursor:pointer;">{{ t.t }}</span> {{ t.text }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- COMMENTS -->
+        <sc-if value="{{ showComments }}">
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 22px 26px;">
+            <h2 style="color:#f4f4f4;font-size:34px;font-weight:800;margin:8px 0 16px;letter-spacing:-1px;">Top comments</h2>
+            <div style="display:flex;gap:9px;background:#141414;border:1px solid #262626;border-radius:11px;padding:14px 16px;margin-bottom:24px;">
+              <span style="color:#7d7d7d;font-size:12px;font-weight:700;letter-spacing:1px;flex:none;margin-top:2px;">TLDR</span>
+              <div style="color:#c4c4c4;font-size:15.5px;line-height:1.55;">Commenters mostly praise the talk's craft-over-hype take and the "smart zone / dumb zone" framing, with a few wry jokes about AI turning programmers into markdown-file managers.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:22px;margin-top:4px;">
+              <sc-for list="{{ commentItems }}" as="c" hint-placeholder-count="3">
+                <div>
+                  <div style="display:flex;align-items:center;gap:11px;margin-bottom:8px;">
+                    <div style="{{ c.avatarStyle }}">{{ c.initials }}</div>
+                    <span style="color:#f1f1f1;font-size:16px;font-weight:700;">{{ c.handle }}</span>
+                    <span style="display:flex;align-items:center;gap:4px;color:#9a9a9a;font-size:14px;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 2 2v3h5.6a2 2 0 0 1 2 2.3l-1.4 8a2 2 0 0 1-2 1.7H7"/></svg>
+                      {{ c.likes }}
+                    </span>
+                  </div>
+                  <div style="color:#c8c8c8;font-size:16px;line-height:1.55;">{{ c.text }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- TRANSCRIPT -->
+        <sc-if value="{{ showTranscript }}">
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 22px 26px;">
+            <h2 style="color:#f4f4f4;font-size:34px;font-weight:800;margin:8px 0 16px;letter-spacing:-1px;">Transcript</h2>
+            <div style="{{ geminiStyle }}" onClick="{{ onGemini }}">
+              <svg width="17" height="17" viewBox="0 0 24 24"><defs><linearGradient id="rcpGem2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e6dcff"/></linearGradient></defs><path d="M12 2c.5 4.5 3.5 7.5 8 8-4.5.5-7.5 3.5-8 8-.5-4.5-3.5-7.5-8-8 4.5-.5 7.5-3.5 8-8z" fill="url(#rcpGem2)"/></svg>
+              Outline framework in Gemini Canvas
+            </div>
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              <sc-for list="{{ transcriptItems }}" as="t" hint-placeholder-count="3">
+                <div style="font-size:16.5px;line-height:1.6;color:#cccccc;"><span style="color:#4a9eef;font-weight:600;cursor:pointer;margin-right:6px;">{{ t.t }}</span>{{ t.text }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ASK THE VIDEO (chat) -->
+        <sc-if value="{{ showAsk }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+            <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 22px 12px;">
+              <div style="display:flex;align-items:center;gap:8px;color:#8a8a8a;font-size:13px;">
+                <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(75,158,239,.12);color:#79b8f5;border:1px solid rgba(75,158,239,.3);border-radius:11px;padding:3px 9px;font-weight:600;font-size:12px;">BETA</span>
+                Grounded in this video's transcript
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;background:#161616;border:1px solid #303030;border-radius:9px;padding:7px 11px;color:#cfcfcf;font-size:13px;font-weight:600;cursor:pointer;" style-hover="border-color:#454545;" onClick="{{ onGemini }}">
+                <svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 2c.5 4.5 3.5 7.5 8 8-4.5.5-7.5 3.5-8 8-.5-4.5-3.5-7.5-8-8 4.5-.5 7.5-3.5 8-8z" fill="#9b8cff"/></svg>
+                Gemini
+              </div>
+            </div>
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:8px 22px 8px;">
+              <sc-for list="{{ chatItems }}" as="m" hint-placeholder-count="1">
+                <div style="{{ m.rowStyle }}"><div style="{{ m.bubbleStyle }}">{{ m.text }}</div></div>
+              </sc-for>
+              <sc-if value="{{ sending }}">
+                <div style="display:flex;justify-content:flex-start;margin-bottom:12px;">
+                  <div style="display:flex;gap:5px;padding:14px 16px;background:#1f1f1f;border-radius:14px;border-top-left-radius:4px;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:#888;animation:rcpBlink 1.2s infinite;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#888;animation:rcpBlink 1.2s infinite .2s;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#888;animation:rcpBlink 1.2s infinite .4s;"></span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="flex:none;display:flex;gap:10px;padding:12px 18px 16px;border-top:1px solid #1d1d1d;">
+              <input value="{{ input }}" onInput="{{ onInput }}" onKeyDown="{{ onKey }}" placeholder="Ask anything about this video…" style="flex:1;background:#161616;border:1px solid #303030;border-radius:11px;padding:12px 14px;color:#eee;font-size:15px;outline:none;font-family:inherit;" />
+              <div style="{{ sendStyle }}" onClick="{{ onSend }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid #383838;color:#f0f0f0;padding:13px 20px;border-radius:11px;font-size:14.5px;box-shadow:0 8px 30px rgba(0,0,0,.5);animation:rcpToast .2s ease;z-index:50;">{{ toast }}</div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#3eb19e&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;summary&quot;,&quot;options&quot;:[&quot;summary&quot;,&quot;timestamped&quot;,&quot;ask&quot;,&quot;comments&quot;,&quot;transcript&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;showPage&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.tsItems = [
+      { t: '00:00', text: 'Software engineering fundamentals still apply in the AI era; the speaker shares a workflow for effective AI coding.' },
+      { t: '02:59', text: 'To optimize the AI coding workflow, break large tasks into smaller ones within the AI\u2019s "smart zone" and structure the process into phases to avoid context limitations.' },
+      { t: '07:14', text: 'Treat each phase as a fresh context: write a brief, let the model produce a plan, grill it, then implement \u2014 keeping the working set well under the smart-zone limit.' },
+      { t: '12:40', text: 'Capture design decisions from grilling sessions into a PRD so the reasoning survives context resets and can seed the next session.' },
+    ];
+    this.transcriptItems = [
+      { t: '00:00', text: "Yeah, we good. >> Okay, folks, we're at capacity. Let's kick off. I don't want you waiting here for 25 more minutes before some arbitrary deadline. So, welcome. My name is Matt. Uh, I'm a teacher and I suppose now I teach AI. We have a link up here if you've not already been to this, which has the exercises for the stuff we're going to do today. This is going to be around two hours. And the thesis under which I've been operating for the last six months or so is that we all think AI is a new paradigm, right? AI is obviously changing a lot of things. And I feel that when we talk about AI being a new paradigm, we forget that actually software engineering fundamentals \u2014 the stuff that's really crucial to working with humans \u2014 also works super well with AI." },
+      { t: '02:59', text: "So the first big idea is this notion of a smart zone. When you start a conversation, the model is sharp. But beyond about a hundred thousand tokens it starts to make, frankly, stupid decisions. So the whole game is sizing your tasks so they fit inside that smart zone \u2014 the same way you'd scope a ticket for a junior engineer." },
+      { t: '07:14', text: "What I do is treat every phase as a clean context. I write a short brief, I get the model to produce a plan, I grill it \u2014 I ask it why, I push back \u2014 and only then do we implement. Those grilling sessions easily generate twenty-five thousand tokens of really valuable design reasoning, and that should not just evaporate." },
+      { t: '12:40', text: "So we capture it. We summarize the session into a product requirements document: the problem, the solution, the user stories, the implementation notes, the testing decisions. Then I clear the context back to the system prompt and feed the PRD back in. That keeps state consistent across sessions far better than compacting does." },
+    ];
+    this.commentItems = [
+      { initials: 'Qu', bg: 'linear-gradient(135deg,#ff4fa3,#d61f69)', handle: '@mistermanko', likes: '322', text: 'Wanted to become a programmer, became a markdown-file-manager. Thanks AI.' },
+      { initials: 'OM', bg: 'linear-gradient(135deg,#5b8def,#7b5cf0)', handle: '@TheOrionMusicNetwork', likes: '301', text: 'Just want to say that you (Matt Pocock \u2014 if you ever read this) are doing a great thing for people. I think most people are too embarrassed (or proud) to think that there is anything to be learned\u2026' },
+      { initials: 'DV', bg: 'linear-gradient(135deg,#23c483,#159957)', handle: '@devon.builds', likes: '188', text: 'The "smart zone / dumb zone" framing finally made token limits click for me. Restructured my whole agent loop after this.' },
+      { initials: 'KL', bg: 'linear-gradient(135deg,#f7971e,#ef4e2b)', handle: '@kaylee.codes', likes: '142', text: 'Clearing context to reset to the system prompt instead of compacting is such an underrated tip.' },
+    ];
+    this.state = {
+      tab: props.startTab || 'summary',
+      settingsOpen: false,
+      settings: { focus: 'Insightful', format: 'List', count: 'Auto', emojis: true, highlights: true, grouped: true },
+      chat: [{ role: 'assistant', text: "Hi! \uD83E\uDD16 I've read the full transcript of this talk. Ask me anything \u2014 the framework, a specific moment, or how to apply it." }],
+      input: '',
+      sending: false,
+      toast: '',
+    };
+  }
+
+  accent() { return this.props.accent || '#f1581f'; }
+  transcriptText() { return this.transcriptItems.map(b => '[' + b.t + '] ' + b.text).join('\n\n'); }
+
+  setTab(t) { this.setState({ tab: t, settingsOpen: false }); }
+  toggleSettings() { this.setState(s => ({ settingsOpen: !s.settingsOpen })); }
+  setSetting(k, v) { this.setState(s => ({ settings: Object.assign({}, s.settings, { [k]: v }) })); }
+  toggleFeature(k) { this.setState(s => ({ settings: Object.assign({}, s.settings, { [k]: !s.settings[k] }) })); }
+
+  showToast(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: '' }), 2800);
+  }
+
+  onGemini() {
+    const prompt = 'You are given the full transcript of a YouTube talk. Do two things and lay them out as a clean document (a "canvas"):\n\n1. OUTLINE THE FRAMEWORK \u2014 reconstruct the step-by-step workflow / mental model the speaker teaches, as a structured nested outline with headings and sub-points.\n2. SUMMARY \u2014 a tight 4-6 sentence executive summary of the talk.\n\nUse clear markdown headings.\n\n--- TRANSCRIPT ---\n' + this.transcriptText();
+    try { if (navigator.clipboard) navigator.clipboard.writeText(prompt); } catch (e) {}
+    try { window.open('https://gemini.google.com/app', '_blank'); } catch (e) {}
+    this.showToast('Transcript + prompt copied \u2014 paste into Gemini Canvas');
+  }
+
+  onCopy() {
+    try { if (navigator.clipboard) navigator.clipboard.writeText(this.transcriptText()); } catch (e) {}
+    this.showToast('Copied to clipboard');
+  }
+  onShare() { this.showToast('Share link copied'); }
+
+  onInput(e) { this.setState({ input: e.target.value }); }
+  onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } }
+
+  async send() {
+    const q = (this.state.input || '').trim();
+    if (!q || this.state.sending) return;
+    this.setState(s => ({ chat: s.chat.concat([{ role: 'user', text: q }]), input: '', sending: true }));
+    try {
+      const sys = "You are a helpful assistant answering questions about a specific YouTube talk, using only its transcript. Be concise and conversational (2-4 sentences). If the transcript doesn't cover it, say so. Transcript:\n" + this.transcriptText();
+      const reply = await window.claude.complete({ messages: [{ role: 'user', content: sys + '\n\nQuestion: ' + q }] });
+      this.setState(s => ({ chat: s.chat.concat([{ role: 'assistant', text: reply || 'Sorry, I had no answer for that.' }]), sending: false }));
+    } catch (err) {
+      this.setState(s => ({ chat: s.chat.concat([{ role: 'assistant', text: 'Sorry \u2014 I had trouble reaching the model. Please try again.' }]), sending: false }));
+    }
+  }
+
+  tabStyle(active) {
+    return { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '34px', borderRadius: '9px', cursor: 'pointer', transition: 'all .12s', background: active ? '#3d3d3d' : 'transparent', color: active ? '#f0f0f0' : '#8f8f8f' };
+  }
+  segStyle(active) {
+    return { padding: '9px 18px', borderRadius: '9px', fontSize: '15.5px', cursor: 'pointer', userSelect: 'none', transition: 'all .12s', background: active ? '#333' : 'transparent', color: active ? '#f2f2f2' : '#9a9a9a', border: active ? '1px solid #3d3d3d' : '1px solid #2b2b2b' };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const closed = !s.settingsOpen;
+    const acc = this.accent();
+    const focusOpts = ['Insightful', 'Funny', 'Actionable', 'Controversial'].map(o => ({ label: o, style: this.segStyle(s.settings.focus === o), onClick: () => this.setSetting('focus', o) }));
+    const formatOpts = ['List', 'Q&A'].map(o => ({ label: o, style: this.segStyle(s.settings.format === o), onClick: () => this.setSetting('format', o) }));
+    const countOpts = ['Short', 'Auto', 'Detailed'].map(o => ({ label: o, style: this.segStyle(s.settings.count === o), onClick: () => this.setSetting('count', o) }));
+    const feats = [{ k: 'emojis', l: 'Add emojis' }, { k: 'highlights', l: 'Highlights' }, { k: 'grouped', l: 'Grouped' }];
+    const featureItems = feats.map(f => {
+      const on = !!s.settings[f.k];
+      return {
+        label: f.l,
+        onClick: () => this.toggleFeature(f.k),
+        trackStyle: { width: '46px', height: '26px', borderRadius: '14px', display: 'flex', alignItems: 'center', padding: '3px', cursor: 'pointer', transition: 'all .15s', background: on ? acc : '#3a3a3a', justifyContent: on ? 'flex-end' : 'flex-start' },
+        knobStyle: { width: '20px', height: '20px', borderRadius: '50%', background: '#fff' },
+      };
+    });
+    const commentItems = this.commentItems.map(c => ({
+      initials: c.initials, handle: c.handle, likes: c.likes, text: c.text,
+      avatarStyle: { width: '38px', height: '38px', borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff', background: c.bg },
+    }));
+    const chatItems = s.chat.map(m => {
+      const u = m.role === 'user';
+      return {
+        text: m.text,
+        rowStyle: { display: 'flex', justifyContent: u ? 'flex-end' : 'flex-start', marginBottom: '12px' },
+        bubbleStyle: { maxWidth: '82%', padding: '11px 14px', borderRadius: '15px', fontSize: '15px', lineHeight: '1.5', background: u ? '#2b6fb0' : '#1d1d1d', color: u ? '#fff' : '#dcdcdc', borderTopRightRadius: u ? '4px' : '15px', borderTopLeftRadius: u ? '15px' : '4px', whiteSpace: 'pre-wrap' },
+      };
+    });
+
+    return {
+      showPage: this.props.showPage !== false,
+      settingsOpen: s.settingsOpen,
+      settingsClosed: closed,
+      showSummary: closed && s.tab === 'summary',
+      showTimestamped: closed && s.tab === 'timestamped',
+      showAsk: closed && s.tab === 'ask',
+      showComments: closed && s.tab === 'comments',
+      showTranscript: closed && s.tab === 'transcript',
+
+      gemStyle: this.tabStyle(closed && s.tab === 'summary'),
+      listStyle: this.tabStyle(closed && s.tab === 'timestamped'),
+      askStyle: this.tabStyle(closed && s.tab === 'ask'),
+      comStyle: this.tabStyle(closed && s.tab === 'comments'),
+      ccStyle: this.tabStyle(closed && s.tab === 'transcript'),
+
+      setSummary: () => this.setTab('summary'),
+      setTimestamped: () => this.setTab('timestamped'),
+      setAsk: () => this.setTab('ask'),
+      setComments: () => this.setTab('comments'),
+      setTranscript: () => this.setTab('transcript'),
+      toggleSettings: () => this.toggleSettings(),
+
+      settings: s.settings,
+      focusOpts, formatOpts, countOpts, featureItems,
+      tsItems: this.tsItems,
+      transcriptItems: this.transcriptItems,
+      commentItems,
+      chatItems,
+      sending: s.sending,
+      input: s.input,
+      onInput: (e) => this.onInput(e),
+      onKey: (e) => this.onKey(e),
+      onSend: () => this.send(),
+      onGemini: () => this.onGemini(),
+      onCopy: () => this.onCopy(),
+      onShare: () => this.onShare(),
+
+      ctaStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '15px', borderRadius: '12px', background: acc, color: '#fff', fontWeight: '700', fontSize: '17px', cursor: 'pointer' },
+      upgradeStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '15px', borderRadius: '12px', background: acc, color: '#fff', fontWeight: '700', fontSize: '17px', cursor: 'pointer' },
+      geminiStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', width: '100%', padding: '12px', borderRadius: '11px', background: 'linear-gradient(135deg,#3a7bd5,#9b5cf0)', color: '#fff', fontWeight: '600', fontSize: '15px', cursor: 'pointer', marginBottom: '22px' },
+      sendStyle: { width: '46px', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '11px', background: acc, cursor: 'pointer' },
+
+      hasToast: !!s.toast,
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

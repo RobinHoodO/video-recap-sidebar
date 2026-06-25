@@ -162,6 +162,13 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
     window.open("https://gemini.google.com/app", "_blank");
     showToast("Transcript + prompt copied — paste into Gemini");
   };
+  const onLibrarian = async () => {
+    if (!transcriptText) return showToast("No transcript yet");
+    showToast("Sending to Librarian…");
+    const title = document.title.replace(/\s*-\s*YouTube$/, "");
+    const r = await chrome.runtime.sendMessage({ type: "librarian", title, url: location.href, text: transcriptText });
+    showToast(r?.ok ? "Sent to Librarian ✓ — filing into the wiki" : `⚠ ${r?.error || "Failed to send"}`);
+  };
 
   const send = () => {
     const q = input.trim();
@@ -186,7 +193,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
     return null;
   };
 
-  const focusOpts = ["Insightful", "Funny", "Actionable", "Controversial"];
+  const focusOpts = ["Insightful", "Framework", "Funny", "Actionable", "Controversial"];
   const formatOpts = ["List", "Q&A"];
   const countOpts = ["Short", "Auto", "Detailed"];
   const features: { k: keyof Settings; l: string }[] = [{ k: "emojis", l: "Add emojis" }, { k: "highlights", l: "Highlights" }, { k: "grouped", l: "Grouped" }];
@@ -219,6 +226,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <div style={iconBtn} onClick={onCopy}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></div>
           <div style={iconBtn} onClick={onShare}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3" /><path d="M8 7l4-4 4 4" /><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></div>
+          <div style={iconBtn} onClick={onLibrarian} title="Send to Librarian — file the full transcript into the wiki"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg></div>
           {closed ? (
             <div style={iconBtn} onClick={() => setSettingsOpen(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="7" x2="21" y2="7" /><circle cx="9" cy="7" r="2.3" fill="#0a0a0a" /><line x1="3" y1="13.5" x2="21" y2="13.5" /><circle cx="15" cy="13.5" r="2.3" fill="#0a0a0a" /><line x1="3" y1="20" x2="21" y2="20" /><circle cx="7" cy="20" r="2.3" fill="#0a0a0a" /></svg></div>
           ) : (

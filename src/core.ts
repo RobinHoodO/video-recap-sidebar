@@ -17,6 +17,7 @@ export type Settings = {
   language: string;
   apifyToken: string;
   geminiPrompt: string;
+  librarianSecret: string;
 };
 
 // Instruction placed above the transcript when sending to Gemini Canvas.
@@ -36,7 +37,12 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "English",
   apifyToken: "",
   geminiPrompt: DEFAULT_GEMINI_PROMPT,
+  // Hermes "Librarian" webhook secret (localhost-only; X-Gitlab-Token auth).
+  librarianSecret: "***REMOVED***",
 };
+
+// Hermes gateway "Send to Librarian" webhook — ingests the page into the wiki.
+export const LIBRARIAN_WEBHOOK_URL = "http://127.0.0.1:8644/webhooks/librarian-ingest";
 
 // ── Transcript (runs in the content script / page DOM) ───────────────────────
 export type Segment = { tStartMs: number; text: string };
@@ -517,6 +523,23 @@ const countHint: Record<string, string> = {
 };
 
 function summaryPrompt(transcript: string, s: Settings): { system: string; user: string } {
+  // "Framework" focus: extract the FULL teachable framework, comprehensively —
+  // every concept/step as its own bullet, ordered so they build on each other.
+  if (s.focus === "Framework") {
+    return {
+      system: `You distill YouTube talks into a comprehensive, teachable framework. Respond in ${s.language}. Return ONLY valid JSON, no markdown fences.`,
+      user: `Extract the COMPLETE framework taught in this video as JSON of the shape {"heading": string, "bullets": [{"emoji": string, "text": string}]}.
+- "heading" names the overall framework.
+- Be exhaustive: one bullet per distinct concept, step, principle, component, or rule — typically 10-20 bullets. Do not omit anything important.
+- Order bullets so they build on each other (foundational ideas first).
+- Each bullet starts with a short bold lead phrase naming the idea, then a concrete one-sentence explanation of it.
+- ${s.emojis ? "Give each bullet a single relevant leading emoji in the \"emoji\" field." : "Leave \"emoji\" as an empty string."}
+- ${s.highlights ? "Wrap the 2-4 most important terms per bullet in <hl></hl> tags." : "Do not add any highlight tags."}
+
+TRANSCRIPT:
+${transcript}`,
+    };
+  }
   const hl = s.highlights
     ? "Wrap 3-6 of the most important key terms or phrases per item in <hl></hl> tags."
     : "Do not add any highlight tags.";

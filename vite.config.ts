@@ -13,6 +13,7 @@ const manifest = defineManifest({
     "https://api.anthropic.com/*",
     "https://openrouter.ai/*",
     "https://api.apify.com/*",
+    "http://127.0.0.1:8644/*",
   ],
   background: { service_worker: "src/background.ts", type: "module" },
   content_scripts: [

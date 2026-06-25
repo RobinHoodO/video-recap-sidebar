@@ -5,6 +5,9 @@ import {
   fmtTime,
   parseTime,
   transcriptToText,
+  sendToWorker,
+  readPageComments,
+  type CommentItem,
   type Provider,
   type Segment,
   type Settings,
@@ -14,13 +17,20 @@ import {
 
 const ACCENT = "#f1581f";
 
-// Comments aren't wired to a real source yet (would need the YouTube comment
-// API). ponytail: demo data until that phase.
-const commentItems = [
-  { initials: "Qu", bg: "linear-gradient(135deg,#ff4fa3,#d61f69)", handle: "@mistermanko", likes: "322", text: "Wanted to become a programmer, became a markdown-file-manager. Thanks AI." },
-  { initials: "OM", bg: "linear-gradient(135deg,#5b8def,#7b5cf0)", handle: "@TheOrionMusicNetwork", likes: "301", text: "Just want to say that you are doing a great thing for people." },
-  { initials: "DV", bg: "linear-gradient(135deg,#23c483,#159957)", handle: "@devon.builds", likes: "188", text: "The smart-zone / dumb-zone framing finally made token limits click for me." },
+// Deterministic avatar from a handle: initials + a gradient picked by char-sum.
+const COMMENT_BGS = [
+  "linear-gradient(135deg,#ff4fa3,#d61f69)",
+  "linear-gradient(135deg,#5b8def,#7b5cf0)",
+  "linear-gradient(135deg,#23c483,#159957)",
+  "linear-gradient(135deg,#f7971e,#ffd200)",
+  "linear-gradient(135deg,#36d1dc,#5b86e5)",
 ];
+function commentAvatar(handle: string) {
+  const name = handle.replace(/^@/, "");
+  const initials = (name.slice(0, 2) || "??").toUpperCase();
+  const sum = [...handle].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return { initials, bg: COMMENT_BGS[sum % COMMENT_BGS.length] };
+}
 
 type Tab = "summary" | "timestamped" | "ask" | "comments" | "transcript";
 type ChatMsg = { role: "user" | "assistant"; text: string };
@@ -88,7 +98,15 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState("");
+  const [comments, setComments] = useState<CommentItem[] | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+
+  // Read YouTube's rendered comments when the tab is first opened. null = not
+  // attempted; [] = attempted but none loaded (user hasn't scrolled to them).
+  const loadComments = () => setComments(readPageComments());
+  useEffect(() => {
+    if (tab === "comments" && comments === null) loadComments();
+  }, [tab, comments]);
 
   const closed = !settingsOpen;
   const hasKey = !!settings.apiKey;
@@ -105,7 +123,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   }, []);
 
   async function askLLM(kind: "summary" | "timestamped" | "ask", question = ""): Promise<LlmResponse> {
-    return (await chrome.runtime.sendMessage({ type: "llm", kind, transcript: transcriptText, question })) as LlmResponse;
+    return await sendToWorker<LlmResponse>({ type: "llm", kind, transcript: transcriptText, question });
   }
 
   function generate(kind: "summary" | "timestamped") {
@@ -166,7 +184,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
     if (!transcriptText) return showToast("No transcript yet");
     showToast("Sending to Librarian…");
     const title = document.title.replace(/\s*-\s*YouTube$/, "");
-    const r = await chrome.runtime.sendMessage({ type: "librarian", title, url: location.href, text: transcriptText });
+    const r = await sendToWorker<{ ok: boolean; error?: string }>({ type: "librarian", title, url: location.href, text: transcriptText });
     showToast(r?.ok ? "Sent to Librarian ✓ — filing into the wiki" : `⚠ ${r?.error || "Failed to send"}`);
   };
 
@@ -330,20 +348,29 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
 
         {closed && tab === "comments" && (
           <div style={scrollPane}>
-            <h2 style={{ color: "#f4f4f4", fontSize: 34, fontWeight: 800, margin: "8px 0 16px", letterSpacing: -1 }}>Top comments</h2>
-            <div style={{ color: "#7d7d7d", fontSize: 12.5, marginBottom: 18 }}>Demo data — comment summaries land in a later phase.</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              {commentItems.map((c, i) => (
-                <div key={i}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 8 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff", background: c.bg }}>{c.initials}</div>
-                    <span style={{ color: "#f1f1f1", fontSize: 16, fontWeight: 700 }}>{c.handle}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#9a9a9a", fontSize: 14 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 2 2v3h5.6a2 2 0 0 1 2 2.3l-1.4 8a2 2 0 0 1-2 1.7H7" /></svg>{c.likes}</span>
-                  </div>
-                  <div style={{ color: "#c8c8c8", fontSize: 16, lineHeight: 1.55 }}>{c.text}</div>
-                </div>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0 16px" }}>
+              <h2 style={{ color: "#f4f4f4", fontSize: 34, fontWeight: 800, letterSpacing: -1, margin: 0 }}>Top comments</h2>
+              <span style={{ ...iconBtn, width: "auto", padding: "0 10px", fontSize: 13, color: "#9a9a9a" }} onClick={loadComments} title="Re-read comments from the page">↻ Refresh</span>
             </div>
+            {comments && comments.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+                {comments.map((c, i) => {
+                  const a = commentAvatar(c.handle);
+                  return (
+                    <div key={i}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 8 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: "50%", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff", background: a.bg }}>{a.initials}</div>
+                        <span style={{ color: "#f1f1f1", fontSize: 16, fontWeight: 700 }}>{c.handle}</span>
+                        {c.likes && <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#9a9a9a", fontSize: 14 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 2 2v3h5.6a2 2 0 0 1 2 2.3l-1.4 8a2 2 0 0 1-2 1.7H7" /></svg>{c.likes}</span>}
+                      </div>
+                      <div style={{ color: "#c8c8c8", fontSize: 16, lineHeight: 1.55 }}>{c.text}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <Status>Scroll down to YouTube's comments to load them, then hit ↻ Refresh.</Status>
+            )}
           </div>
         )}
 

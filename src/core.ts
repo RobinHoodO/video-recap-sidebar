@@ -45,6 +45,46 @@ export const DEFAULT_SETTINGS: Settings = {
 // Hermes gateway "Send to Librarian" webhook — ingests the page into the wiki.
 export const LIBRARIAN_WEBHOOK_URL = "http://127.0.0.1:8644/webhooks/librarian-ingest";
 
+// MV3 service workers terminate after ~30s idle. The first message to a
+// sleeping worker can reject with "Could not establish connection / Receiving
+// end does not exist" before Chrome finishes waking it. Retry on that wake-race
+// instead of keeping the worker alive (which MV3 actively discourages).
+// ponytail: 2 retries, linear backoff. Raise if you still see dropped wakes.
+export async function sendToWorker<T>(msg: unknown, retries = 2): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return (await chrome.runtime.sendMessage(msg)) as T;
+    } catch (err) {
+      const m = err instanceof Error ? err.message : String(err);
+      const wakeRace = /Receiving end does not exist|message channel closed|Could not establish connection/i.test(m);
+      if (!wakeRace || attempt >= retries) throw err;
+      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+    }
+  }
+}
+
+// ── Comments (runs in the content script / page DOM) ─────────────────────────
+export type CommentItem = { handle: string; likes: string; text: string };
+
+// Read the top comment threads YouTube has already rendered into the page.
+// Zero-key, same approach as reading the transcript panel. Comments lazy-load
+// on scroll, so this returns [] until the user reaches the comments section —
+// the panel surfaces a "scroll down" hint in that case.
+// ponytail: DOM selectors. If this returns [] when comments are clearly loaded,
+// suspect a YouTube markup rename (same saga as the transcript reader).
+export function readPageComments(max = 20): CommentItem[] {
+  const out: CommentItem[] = [];
+  const threads = document.querySelectorAll("ytd-comment-thread-renderer");
+  for (const t of Array.from(threads)) {
+    if (out.length >= max) break;
+    const handle = (t.querySelector("#author-text")?.textContent || "").trim();
+    const text = (t.querySelector("#content-text")?.textContent || "").trim();
+    const likes = (t.querySelector("#vote-count-middle")?.textContent || "").trim();
+    if (handle && text) out.push({ handle, likes, text: text.replace(/\s+/g, " ") });
+  }
+  return out;
+}
+
 // ── Transcript (runs in the content script / page DOM) ───────────────────────
 export type Segment = { tStartMs: number; text: string };
 

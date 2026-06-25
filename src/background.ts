@@ -39,11 +39,14 @@ async function handle(req: LlmRequest): Promise<LlmResponse> {
 // blocked by the page's private-network restrictions.
 async function sendToLibrarian(req: LibrarianRequest): Promise<{ ok: boolean; error?: string }> {
   const s = await loadSettings();
-  if (!s.librarianSecret) return { ok: false, error: "No Librarian secret set in settings (⚙)." };
+  // Trim: Hermes does a plain constant-time compare of X-Gitlab-Token against
+  // the stored secret, so a single pasted whitespace char → 401 Invalid signature.
+  const secret = (s.librarianSecret || "").trim();
+  if (!secret) return { ok: false, error: "No Librarian secret set in settings (⚙)." };
   try {
     const res = await fetch(LIBRARIAN_WEBHOOK_URL, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-gitlab-token": s.librarianSecret },
+      headers: { "content-type": "application/json", "x-gitlab-token": secret },
       body: JSON.stringify({ title: req.title, url: req.url, selection: req.selection || "", text: req.text }),
     });
     if (!res.ok) return { ok: false, error: `Hermes ${res.status}: ${(await res.text()).slice(0, 150)}` };

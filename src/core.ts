@@ -436,15 +436,23 @@ export async function fetchTranscript(): Promise<Segment[]> {
     const hit = got[key] as Segment[] | undefined;
     if (hit?.length) return hit;
   }
-  const segs = await fetchTranscriptUncached();
-  if (videoId && segs.length) chrome.storage.local.set({ [key]: segs });
+  const segs = await fetchTranscriptUncached(videoId);
+  // Don't cache if the user navigated to another video mid-fetch — that would
+  // poison the new video's cache key with the previous transcript.
+  const onSameVideo = (new URLSearchParams(location.search).get("v") || "") === videoId;
+  if (videoId && segs.length && onSameVideo) chrome.storage.local.set({ [key]: segs });
   return segs;
 }
 
-async function fetchTranscriptUncached(): Promise<Segment[]> {
+async function fetchTranscriptUncached(expectedVid: string): Promise<Segment[]> {
   // Tier 1 (free, instant): caption-track timedtext — works on non-gated videos.
   const pr = readPlayerResponse();
-  const tracks: any[] = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  // YouTube's SPA leaves the PREVIOUS video's ytInitialPlayerResponse in the
+  // page <script> tags after navigation, so only trust these caption tracks if
+  // they belong to the video we're actually on — otherwise we'd fetch (and
+  // generate the recap from) the wrong video's transcript.
+  const stale = !!pr?.videoDetails?.videoId && pr.videoDetails.videoId !== expectedVid;
+  const tracks: any[] = stale ? [] : (pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? []);
   const ordered = [...tracks].sort((a, b) =>
     Number(b.languageCode?.startsWith("en")) - Number(a.languageCode?.startsWith("en"))
   );

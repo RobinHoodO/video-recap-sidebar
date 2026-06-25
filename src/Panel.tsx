@@ -270,6 +270,9 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
             <div style={{ ...label, margin: "26px 0 12px" }}>TRANSCRIPT FALLBACK</div>
             <input style={inputStyle} type="password" value={settings.apifyToken} onChange={(e) => update({ apifyToken: e.target.value })} placeholder="Apify API token (optional)" />
             <div style={{ color: "#6f6f6f", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>Only used when YouTube blocks the in-page transcript (gated captions). Get a token at apify.com — ~$0.50 per 1k transcripts. Stored locally.</div>
+            <div style={{ ...label, margin: "26px 0 12px" }}>LIBRARIAN (HERMES)</div>
+            <input style={inputStyle} type="password" value={settings.librarianSecret} onChange={(e) => update({ librarianSecret: e.target.value })} placeholder="Hermes webhook secret" />
+            <div style={{ color: "#6f6f6f", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>Token for the local “Send to Librarian” webhook. From ~/.hermes/webhook_subscriptions.json (librarian-ingest secret). Stored locally.</div>
             <div style={{ ...label, margin: "26px 0 12px" }}>LANGUAGE</div>
             <input style={inputStyle} value={settings.language} onChange={(e) => update({ language: e.target.value })} placeholder="English" />
             <div style={{ ...label, margin: "26px 0 12px" }}>GEMINI PROMPT</div>

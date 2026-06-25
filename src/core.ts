@@ -37,8 +37,9 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "English",
   apifyToken: "",
   geminiPrompt: DEFAULT_GEMINI_PROMPT,
-  // Hermes "Librarian" webhook secret (localhost-only; X-Gitlab-Token auth).
-  librarianSecret: "***REMOVED***",
+  // Hermes "Librarian" webhook secret — paste in settings (never commit it).
+  // From ~/.hermes/webhook_subscriptions.json → librarian-ingest.secret.
+  librarianSecret: "",
 };
 
 // Hermes gateway "Send to Librarian" webhook — ingests the page into the wiki.

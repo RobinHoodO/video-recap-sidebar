@@ -142,67 +142,175 @@ function findInitialSegments(obj: any): Segment[] {
 
 // Tier 1 (best, free): YouTube's own Innertube get_transcript endpoint. Called
 // same-origin from the page session, so it carries cookies and needs no
-// PoToken — unlike the timedtext CDN, which now returns empty bodies.
-const TRANSCRIPT_PARAMS_RE = /"getTranscriptEndpoint":\s*\{\s*"params":\s*"([^"]+)"/;
-
-// The params live inside a JS/JSON string literal in the page, so they arrive
-// with escapes intact (=, &, …). YouTube decodes these at runtime;
-// we must too, or get_transcript rejects the raw token with 400.
-function decodeJsonStr(s: string): string {
-  try { return JSON.parse(`"${s}"`); } catch { return s; }
-}
-
+// PoToken — unlike the timedtext CDN, which now returns empty bodies. The flow
+// (verified against YouTube.js + yt-dlp): recover the real INNERTUBE_CONTEXT
+// from ytcfg, POST /next to get the transcript panel's params, then POST
+// /get_transcript with the full context + visitor headers.
 async function fetchViaInnertube(): Promise<Segment[]> {
-  const html = document.documentElement.innerHTML;
-  const apiKey = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/)?.[1];
-  const clientVersion =
-    html.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/)?.[1] ||
-    html.match(/"clientVersion":"([0-9.]+)"/)?.[1];
+  const ytOrigin = "https://www.youtube.com";
   const videoId = new URLSearchParams(location.search).get("v");
-  // ponytail: temp breadcrumbs to diagnose gated-video transcript fetch; strip once fixed
-  console.log("[recap] innertube keys", { apiKey: !!apiKey, clientVersion, videoId });
-  if (!apiKey || !clientVersion || !videoId) return [];
-  const context = { client: { clientName: "WEB", clientVersion } };
+  if (!videoId) return [];
 
-  // The transcript `params` token isn't always embedded in the page. If it's
-  // missing, ask the `next` endpoint for it (it returns the transcript panel's
-  // params for any captioned video) — no token construction needed.
-  let raw = html.match(TRANSCRIPT_PARAMS_RE)?.[1];
-  console.log("[recap] params from page html:", !!raw);
-  if (!raw) {
-    const nextRes = await fetch(`https://www.youtube.com/youtubei/v1/next?key=${apiKey}`, {
+  const parseJsonObjectAt = (text: string, start: number): any | null => {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < text.length; i++) {
+      const c = text[i];
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === "{") depth++;
+      else if (c === "}" && --depth === 0) {
+        try { return JSON.parse(text.slice(start, i + 1)); } catch { return null; }
+      }
+    }
+    return null;
+  };
+
+  const pageText = Array.from(document.scripts).map((s) => s.textContent || "").join("\n");
+  const ytcfg: any = {};
+  for (let from = 0; ;) {
+    const i = pageText.indexOf("ytcfg.set", from);
+    if (i === -1) break;
+    const start = pageText.indexOf("{", i);
+    if (start === -1) break;
+    Object.assign(ytcfg, parseJsonObjectAt(pageText, start) || {});
+    from = start + 1;
+  }
+
+  const apiKey =
+    ytcfg.INNERTUBE_API_KEY ||
+    pageText.match(/"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"/)?.[1];
+
+  const context = JSON.parse(JSON.stringify(ytcfg.INNERTUBE_CONTEXT || { client: {} }));
+  context.client ||= {};
+  context.user ||= { enableSafetyMode: false, lockedSafetyMode: false };
+  context.request ||= { useSsl: true, internalExperimentFlags: [] };
+
+  const clientVersion =
+    context.client.clientVersion ||
+    ytcfg.INNERTUBE_CONTEXT_CLIENT_VERSION ||
+    pageText.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION"\s*:\s*"([^"]+)"/)?.[1];
+
+  if (!clientVersion) return [];
+
+  context.client.clientName ||= "WEB";
+  context.client.clientVersion = clientVersion;
+  context.client.hl ||= ytcfg.HL || "en";
+  context.client.gl ||= ytcfg.GL || "US";
+  context.client.visitorData ||=
+    ytcfg.VISITOR_DATA ||
+    pageText.match(/"visitorData"\s*:\s*"([^"]+)"/)?.[1];
+  context.client.originalUrl ||= location.href;
+  context.client.timeZone ||= Intl.DateTimeFormat().resolvedOptions().timeZone;
+  context.client.utcOffsetMinutes ??= -new Date().getTimezoneOffset();
+  context.client.userAgent ||= navigator.userAgent;
+  context.client.clientFormFactor ||= "UNKNOWN_FORM_FACTOR";
+
+  const endpointUrl = (endpoint: "next" | "get_transcript") => {
+    const url = new URL(`/youtubei/v1/${endpoint}`, ytOrigin);
+    if (apiKey) url.searchParams.set("key", apiKey);
+    url.searchParams.set("prettyPrint", "false");
+    return url.toString();
+  };
+
+  const sha1Hex = async (value: string) => {
+    const hash = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  const readCookie = (name: string) => {
+    for (const part of document.cookie.split(/;\s*/)) {
+      const eq = part.indexOf("=");
+      if (eq > 0 && part.slice(0, eq) === name) return part.slice(eq + 1);
+    }
+    return "";
+  };
+
+  const headers: Record<string, string> = {
+    "accept": "*/*",
+    "content-type": "application/json",
+    "x-youtube-client-name": String(ytcfg.INNERTUBE_CONTEXT_CLIENT_NAME || 1),
+    "x-youtube-client-version": clientVersion,
+    "x-origin": ytOrigin,
+  };
+  if (context.client.visitorData) headers["x-goog-visitor-id"] = context.client.visitorData;
+  if (ytcfg.SESSION_INDEX !== undefined) headers["x-goog-authuser"] = String(ytcfg.SESSION_INDEX);
+  if (ytcfg.LOGGED_IN === true) headers["x-youtube-bootstrap-logged-in"] = "true";
+
+  const authParts: string[] = [];
+  const addSidAuth = async (scheme: string, sid: string) => {
+    const ts = Math.floor(Date.now() / 1000).toString();
+    authParts.push(`${scheme} ${ts}_${await sha1Hex(`${ts} ${sid} ${ytOrigin}`)}`);
+  };
+  const sapisid = readCookie("SAPISID") || readCookie("__Secure-3PAPISID");
+  const sid1p = readCookie("__Secure-1PAPISID");
+  const sid3p = readCookie("__Secure-3PAPISID");
+  if (sapisid) await addSidAuth("SAPISIDHASH", sapisid);
+  if (sid1p) await addSidAuth("SAPISID1PHASH", sid1p);
+  if (sid3p) await addSidAuth("SAPISID3PHASH", sid3p);
+  if (authParts.length) headers["authorization"] = authParts.join(" ");
+
+  const readJson = async (res: Response) =>
+    JSON.parse((await res.text()).replace(/^\)\]\}'\n?/, ""));
+
+  const findTranscriptParams = (obj: any): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    if (typeof obj.getTranscriptEndpoint?.params === "string") {
+      return obj.getTranscriptEndpoint.params;
+    }
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = findTranscriptParams(item);
+        if (found) return found;
+      }
+      return null;
+    }
+    for (const key of Object.keys(obj)) {
+      const found = findTranscriptParams(obj[key]);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  let nextRes: Response;
+  try {
+    nextRes = await fetch(endpointUrl("next"), {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ context, videoId }),
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ context, videoId, racyCheckOk: true, contentCheckOk: true }),
     });
-    console.log("[recap] /next status", nextRes.status);
-    if (nextRes.ok) {
-      const nextTxt = await nextRes.text();
-      raw = nextTxt.match(TRANSCRIPT_PARAMS_RE)?.[1];
-      console.log("[recap] params from /next:", !!raw, "| has getTranscriptEndpoint:", nextTxt.includes("getTranscriptEndpoint"));
+  } catch { return []; }
+  if (!nextRes.ok) return [];
+
+  const nextJson = await readJson(nextRes);
+  let params: string | null = null;
+  for (const panel of nextJson.engagementPanels || []) {
+    const renderer = panel.engagementPanelSectionListRenderer;
+    if (renderer?.panelIdentifier === "engagement-panel-searchable-transcript") {
+      params = findTranscriptParams(renderer.content) || findTranscriptParams(renderer);
+      break;
     }
   }
-  if (!raw) return [];
-  const params = decodeJsonStr(raw);
-  console.log("[recap] params had escapes:", raw !== params);
+  params ||= findTranscriptParams(nextJson);
+  if (!params) return [];
 
-  const res = await fetch(`https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ context, params }),
-  });
-  console.log("[recap] get_transcript status", res.status);
-  if (!res.ok) return [];
-  const txt = (await res.text()).trim();
-  if (!txt) return [];
+  let transcriptRes: Response;
   try {
-    const segs = findInitialSegments(JSON.parse(txt));
-    console.log("[recap] innertube segments:", segs.length);
-    return segs;
-  } catch (e) {
-    console.log("[recap] get_transcript parse failed", e);
-    return [];
-  }
+    transcriptRes = await fetch(endpointUrl("get_transcript"), {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ context, params }),
+    });
+  } catch { return []; }
+  if (!transcriptRes.ok) return [];
+
+  const transcriptJson = await readJson(transcriptRes);
+  return findInitialSegments(transcriptJson)
+    .map((s) => ({ tStartMs: s.tStartMs, text: decodeEntities(s.text).replace(/\s+/g, " ").trim() }))
+    .filter((s) => s.text);
 }
 
 // Tier 3.5 (paid, BYO token): the Apify scraper works on PoToken-gated videos

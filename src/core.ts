@@ -375,22 +375,35 @@ async function fetchViaTranscriptPanel(): Promise<Segment[]> {
   let segs = fetchFromOpenTranscriptPanel();
   if (segs.length) return segs;
 
-  const findBtn = (): HTMLElement | null =>
-    (document.querySelector('button[aria-label="Show transcript" i]') as HTMLElement | null) ||
-    (document.querySelector("ytd-video-description-transcript-section-renderer button") as HTMLElement | null);
+  const findBtn = (): HTMLElement | null => {
+    const direct = document.querySelector(
+      'button[aria-label="Show transcript" i], ytd-video-description-transcript-section-renderer button'
+    ) as HTMLElement | null;
+    if (direct) return direct;
+    // Fallback: any clickable whose label or text mentions "transcript".
+    return (
+      Array.from(document.querySelectorAll<HTMLElement>("button, a, yt-button-shape")).find(
+        (el) =>
+          /transcript/i.test(el.getAttribute("aria-label") || "") ||
+          /show transcript/i.test(el.textContent || "")
+      ) || null
+    );
+  };
+
+  // The transcript button is hidden until the description is expanded — do that
+  // first (selectors vary across YouTube layouts, so try several).
+  (document.querySelector(
+    "ytd-text-inline-expander #expand, #description-inline-expander #expand, tp-yt-paper-button#expand"
+  ) as HTMLElement | null)?.click();
 
   let btn = findBtn();
-  if (!btn) {
-    // The button lives at the bottom of the description — expand it first.
-    (document.querySelector("ytd-text-inline-expander #expand, tp-yt-paper-button#expand") as HTMLElement | null)?.click();
-    for (let i = 0; i < 12 && !btn; i++) { await wait(150); btn = findBtn(); }
-  }
+  for (let i = 0; i < 16 && !btn; i++) { await wait(150); btn = findBtn(); }
   if (!btn) return [];
 
   const wasOpen = !!document.querySelector(`${TRANSCRIPT_PANEL_SEL}[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]`);
   btn.click();
 
-  for (let i = 0; i < 30 && !segs.length; i++) { await wait(150); segs = fetchFromOpenTranscriptPanel(); }
+  for (let i = 0; i < 40 && !segs.length; i++) { await wait(150); segs = fetchFromOpenTranscriptPanel(); }
 
   // Close the panel again only if we were the ones who opened it.
   if (segs.length && !wasOpen) {

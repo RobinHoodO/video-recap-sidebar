@@ -553,7 +553,7 @@ export function transcriptToText(segs: Segment[]): string {
 
 // ── LLM result types ─────────────────────────────────────────────────────────
 export type SummaryBullet = { emoji: string; text: string };
-export type SummaryResult = { heading: string; bullets: SummaryBullet[] };
+export type SummaryResult = { heading: string; bullets: SummaryBullet[]; markdown?: string };
 export type TimestampItem = { t: string; text: string };
 export type TimestampedResult = { intro: string; items: TimestampItem[] };
 
@@ -571,14 +571,24 @@ function summaryPrompt(transcript: string, s: Settings): { system: string; user:
   // every concept/step as its own bullet, ordered so they build on each other.
   if (s.focus === "Framework") {
     return {
-      system: `You distill YouTube talks into a comprehensive, teachable framework. Respond in ${s.language}. Return ONLY valid JSON, no markdown fences.`,
-      user: `Extract the COMPLETE framework taught in this video as JSON of the shape {"heading": string, "bullets": [{"emoji": string, "text": string}]}.
+      system: `You are a principal systems architect and technical writer. You distill YouTube talks into a comprehensive, deeply structured, and teachable framework. Respond in ${s.language}. Return ONLY valid JSON, no markdown fences.`,
+      user: `Extract the COMPLETE framework taught in this video as JSON of the shape {"heading": string, "markdown": string, "bullets": []}.
 - "heading" names the overall framework.
-- Be exhaustive: one bullet per distinct concept, step, principle, component, or rule — typically 10-20 bullets. Do not omit anything important.
-- Order bullets so they build on each other (foundational ideas first).
-- Each bullet starts with a short bold lead phrase naming the idea, then a concrete one-sentence explanation of it.
-- ${s.emojis ? "Give each bullet a single relevant leading emoji in the \"emoji\" field." : "Leave \"emoji\" as an empty string."}
-- ${s.highlights ? "Wrap the 2-4 most important terms per bullet in <hl></hl> tags." : "Do not add any highlight tags."}
+- "bullets" must be an empty array [].
+- "markdown" must contain a comprehensive, exhaustive, and beautifully formatted markdown document of the framework.
+
+Structure the "markdown" field with the following sections and formatting:
+1. **Introduction / Meta-Overview**: A concise paragraph summarizing the high-level context, strategic value of the framework, and what the reader will learn.
+2. **Core Concepts / Philosophy (The Duality & Taxonomy Principle)**: Deeply break down the main paradigms, contrasting philosophies, or conceptual categories (e.g., Tactical vs. Strategic, Model vs. Harness, Procedures vs. Abilities) using bold headers, bullet lists, and clear explanations.
+3. **The Visual Workflow (The Flow Principle)**: Construct a clean, highly readable Unicode/ASCII flowchart diagram mapping out the logical queue, steps, pipeline, or loops discussed. Wrap this diagram in a markdown code block (using \`\`\` text ... \`\`\`).
+4. **Tooling & Technical Stack**: If specific tools, environments, safety protocols, or configurations were mentioned, detail them concretely.
+5. **Practical Action Steps**: Conclude with a section titled "### Practical Action Steps" listing 3-5 concrete, step-by-step actions that a developer can take today to get started.
+
+Formatting constraints inside "markdown":
+- Use standard markdown headers (###, ####) for sections.
+- Use bold lead phrases for key points.
+- ${s.highlights ? "Wrap the 3-5 most important terms or key concepts in <hl></hl> tags (e.g., <hl>Harness</hl>)." : "Do not add any highlight tags."}
+- Ensure any ASCII flowcharts are perfectly aligned and clean.
 
 TRANSCRIPT:
 ${transcript}`,

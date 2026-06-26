@@ -74,6 +74,129 @@ function renderHl(text: string): ReactNode[] {
   );
 }
 
+// Render markdown-style elements (headers, lists, blockquotes, bold, inline code, and highlights).
+function renderMarkdown(md: string): ReactNode {
+  if (!md) return null;
+
+  const lines = md.split("\n");
+  const elements: ReactNode[] = [];
+  
+  let inCodeBlock = false;
+  let codeBlockLines: string[] = [];
+
+  const parseInlineStyles = (text: string, keyPrefix: string): ReactNode[] => {
+    // Split by bold (**bold**), inline code (`code`), and highlights (<hl>text</hl>)
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|<hl>.*?<\/hl>)/g);
+    return parts.map((part, index) => {
+      const uniqueKey = `${keyPrefix}-${index}`;
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={uniqueKey} style={{ color: "#ffffff", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={uniqueKey} style={{ background: "#252525", padding: "2px 5px", borderRadius: 4, fontFamily: "monospace", fontSize: 13.5, color: "#e4e4e4" }}>{part.slice(1, -1)}</code>;
+      }
+      if (part.startsWith("<hl>") && part.endsWith("</hl>")) {
+        return <span key={uniqueKey} style={hlStyle}>{part.slice(4, -5)}</span>;
+      }
+      return <span key={uniqueKey}>{part}</span>;
+    });
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Handle code blocks (e.g. ASCII diagrams)
+    if (line.trim().startsWith("```")) {
+      if (inCodeBlock) {
+        inCodeBlock = false;
+        elements.push(
+          <pre key={`code-${i}`} style={{ background: "#151515", border: "1px solid #2f2f2f", borderRadius: 6, padding: "12px 14px", overflowX: "auto", fontFamily: "monospace", fontSize: 13, lineHeight: 1.45, color: "#85c5ec", margin: "12px 0" }}>
+            <code>{codeBlockLines.join("\n")}</code>
+          </pre>
+        );
+        codeBlockLines = [];
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      continue;
+    }
+
+    if (line.trim() === "") {
+      elements.push(<div key={`space-${i}`} style={{ height: 8 }} />);
+      continue;
+    }
+
+    // Handle headers
+    if (line.startsWith("### ")) {
+      elements.push(
+        <h3 key={`h3-${i}`} style={{ color: "#ffffff", fontSize: 18, fontWeight: 700, margin: "22px 0 10px", letterSpacing: "-.2px" }}>
+          {parseInlineStyles(line.slice(4), `h3-text-${i}`)}
+        </h3>
+      );
+      continue;
+    }
+    if (line.startsWith("#### ")) {
+      elements.push(
+        <h4 key={`h4-${i}`} style={{ color: "#eeeeee", fontSize: 15.5, fontWeight: 600, margin: "16px 0 8px" }}>
+          {parseInlineStyles(line.slice(5), `h4-text-${i}`)}
+        </h4>
+      );
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      elements.push(
+        <h2 key={`h2-${i}`} style={{ color: "#ffffff", fontSize: 20, fontWeight: 750, margin: "26px 0 12px", letterSpacing: "-.3px" }}>
+          {parseInlineStyles(line.slice(3), `h2-text-${i}`)}
+        </h2>
+      );
+      continue;
+    }
+
+    // Handle blockquotes
+    if (line.startsWith("> ")) {
+      elements.push(
+        <blockquote key={`quote-${i}`} style={{ borderLeft: "3px solid #4a9eef", paddingLeft: 12, margin: "10px 0", color: "#b0b0b0", fontStyle: "italic" }}>
+          {parseInlineStyles(line.slice(2), `quote-text-${i}`)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Handle lists
+    const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const listContent = listMatch[3];
+      const bulletChar = listMatch[2];
+      const isNumbered = /^\d+/.test(bulletChar);
+
+      elements.push(
+        <div key={`list-${i}`} style={{ display: "flex", gap: 8, paddingLeft: indent * 8, margin: "4px 0" }}>
+          <span style={{ color: isNumbered ? "#4a9eef" : "#888", flex: "none", fontWeight: isNumbered ? 600 : "normal" }}>
+            {isNumbered ? bulletChar : "•"}
+          </span>
+          <div style={{ flex: 1 }}>{parseInlineStyles(listContent, `list-text-${i}`)}</div>
+        </div>
+      );
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={`p-${i}`} style={{ margin: "8px 0", color: "#cccccc" }}>
+        {parseInlineStyles(line, `p-text-${i}`)}
+      </p>
+    );
+  }
+
+  return <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>{elements}</div>;
+}
+
 function seek(seconds: number) {
   const v = document.querySelector("video") as HTMLVideoElement | null;
   if (v) { v.currentTime = seconds; v.play?.().catch(() => {}); }
@@ -314,14 +437,20 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
             {gate(summary) ?? (
               <>
                 <h2 style={{ color: "#ededed", fontSize: 21, fontWeight: 700, margin: "0 0 16px", letterSpacing: "-.3px" }}>{summary.data!.heading}</h2>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16, fontSize: 16.5, lineHeight: 1.55, color: "#cccccc" }}>
-                  {(summary.data!.bullets ?? []).map((b, i) => (
-                    <div key={i} style={{ display: "flex", gap: 11 }}>
-                      {b.emoji && <span style={{ fontSize: 18, lineHeight: 1.4, flex: "none" }}>{b.emoji}</span>}
-                      <div>{renderHl(b.text)}</div>
-                    </div>
-                  ))}
-                </div>
+                {summary.data!.markdown ? (
+                  <div style={{ fontSize: 16.5, lineHeight: 1.55, color: "#cccccc" }}>
+                    {renderMarkdown(summary.data!.markdown)}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16, fontSize: 16.5, lineHeight: 1.55, color: "#cccccc" }}>
+                    {(summary.data!.bullets ?? []).map((b, i) => (
+                      <div key={i} style={{ display: "flex", gap: 11 }}>
+                        {b.emoji && <span style={{ fontSize: 18, lineHeight: 1.4, flex: "none" }}>{b.emoji}</span>}
+                        <div>{renderHl(b.text)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>

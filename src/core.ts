@@ -643,7 +643,21 @@ export function buildPrompt(kind: LlmKind, transcript: string, s: Settings, ques
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
 export function parseJsonLoose<T>(raw: string): T {
-  const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  let cleaned = raw.trim();
+  
+  // Try to extract content inside markdown code fences first
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  } else {
+    // Otherwise, try to find the first '{' and last '}' and extract the JSON block
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
+    }
+  }
+  
   return JSON.parse(cleaned) as T;
 }
 

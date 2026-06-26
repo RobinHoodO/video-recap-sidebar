@@ -257,7 +257,9 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
         if (!r) return set({ loading: false, data: null, error: "No response from the model." });
         if (!r.ok) return set({ loading: false, data: null, error: r.error });
         const d: any = r.data;
-        const okShape = kind === "summary" ? Array.isArray(d?.bullets) : Array.isArray(d?.items);
+        const okShape = kind === "summary"
+          ? (settings.focus === "Framework" ? (typeof d?.markdown === "string" || Array.isArray(d?.bullets)) : Array.isArray(d?.bullets))
+          : Array.isArray(d?.items);
         if (!okShape) return set({ loading: false, data: null, error: "The model returned an unexpected format — try again or pick another model." });
         set({ loading: false, data: d, error: "" });
       })

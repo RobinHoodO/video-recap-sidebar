@@ -1,10 +1,10 @@
 // Service worker: the only place the API key is used. The content-script panel
 // sends a transcript + kind; we load settings, call the provider, return data.
 import {
-  DEFAULT_SETTINGS,
   LIBRARIAN_WEBHOOK_URL,
   buildPrompt,
   callLLM,
+  mergeSettings,
   parseJsonLoose,
   type LlmKind,
   type Settings,
@@ -14,11 +14,12 @@ import {
 
 type LlmRequest = { type: "llm"; kind: LlmKind; transcript: string; question?: string };
 type LibrarianRequest = { type: "librarian"; title: string; url: string; text: string; selection?: string };
+type WakeRequest = { type: "wake" };
 type LlmResponse = { ok: true; data: unknown } | { ok: false; error: string };
 
 async function loadSettings(): Promise<Settings> {
   const got = await chrome.storage.local.get("settings");
-  return { ...DEFAULT_SETTINGS, ...(got.settings as Partial<Settings> | undefined) };
+  return mergeSettings(got.settings as Partial<Settings> | undefined);
 }
 
 async function handle(req: LlmRequest): Promise<LlmResponse> {
@@ -52,12 +53,32 @@ async function sendToLibrarian(req: LibrarianRequest): Promise<{ ok: boolean; er
     if (!res.ok) return { ok: false, error: `Hermes ${res.status}: ${(await res.text()).slice(0, 150)}` };
     return { ok: true };
   } catch {
-    return { ok: false, error: "Hermes gateway unreachable — is it running on 127.0.0.1:8644?" };
+    return { ok: false, error: "Hermes gateway unreachable — is Tailscale up and hetzner:8644 listening?" };
   }
 }
 
-chrome.runtime.onMessage.addListener((req: LlmRequest | LibrarianRequest, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((req: LlmRequest | LibrarianRequest | WakeRequest, _sender, sendResponse) => {
+  if (req?.type === "wake") { sendResponse({ ok: true }); return false; }
   if (req?.type === "llm") { handle(req as LlmRequest).then(sendResponse); return true; }
   if (req?.type === "librarian") { sendToLibrarian(req as LibrarianRequest).then(sendResponse); return true; }
   return undefined;
 });
+
+function notifyYouTubeTab(tabId: number, url: string | undefined, reason: string) {
+  if (!url) return;
+  const parsed = new URL(url);
+  if (parsed.hostname !== "www.youtube.com" || parsed.pathname !== "/watch") return;
+  chrome.tabs.sendMessage(tabId, { type: "youtube-video", reason, url }, () => {
+    // The content script may not be injected yet on cold page loads. Ignore that
+    // transient miss; the content script also has its own URL watchdog.
+    void chrome.runtime.lastError;
+  });
+}
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId === 0) notifyYouTubeTab(details.tabId, details.url, "history");
+}, { url: [{ hostEquals: "www.youtube.com", pathEquals: "/watch" }] });
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId === 0) notifyYouTubeTab(details.tabId, details.url, "completed");
+}, { url: [{ hostEquals: "www.youtube.com", pathEquals: "/watch" }] });

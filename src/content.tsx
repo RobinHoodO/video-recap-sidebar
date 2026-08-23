@@ -5,21 +5,67 @@ import { fetchTranscript, fetchFromOpenTranscriptPanel, type Segment } from "./c
 
 const HOST_ID = "vrs-host";
 let root: Root | null = null;
-let containerEl: HTMLElement | null = null;
 let transcriptObserver: MutationObserver | null = null;
+let lastSeenUrl = location.href;
 
 const onWatchPage = () => location.pathname === "/watch";
 const currentVideoId = () => new URLSearchParams(location.search).get("v") || "";
 
+const player = () => document.querySelector("#movie_player");
+
+// The right-hand column of the layout the user is actually watching in: the
+// live player's own flexy. Stale hidden layouts YouTube keeps in the DOM have
+// their own #secondary, which is how the panel used to land on the video.
+function activeSecondary(): Element | null {
+  return player()?.closest("ytd-watch-flexy")?.querySelector("#secondary") ?? null;
+}
+
 // Cap the panel to the current video player height, exposed as a CSS custom
 // property the panel consumes (custom properties inherit through the shadow
-// boundary). Recomputed on resize and navigation.
-function sizeToVideo() {
-  if (!containerEl) return;
-  const player =
-    document.querySelector("#movie_player") || document.querySelector("#player");
-  const h = player?.getBoundingClientRect().height ?? 0;
-  containerEl.style.setProperty("--vrs-max", `${h > 120 ? h : 480}px`);
+// boundary).
+function sizeToVideo(host: HTMLElement) {
+  const h = player()?.getBoundingClientRect().height ?? 0;
+  host.style.setProperty("--vrs-max", `${h > 120 ? h : 480}px`);
+}
+
+// True when the host's box actually intersects the player's box on screen —
+// the one failure mode that matters, tested directly instead of inferred from
+// container identity (which is what kept going wrong).
+function overlapsPlayer(host: HTMLElement): boolean {
+  const p = player()?.getBoundingClientRect();
+  if (!p || p.width === 0) return false;
+  const h = host.getBoundingClientRect();
+  if (h.width === 0 || h.height === 0) return false;
+  const m = 8; // tolerance so touching edges don't count
+  return h.left < p.right - m && h.right > p.left + m && h.top < p.bottom - m && h.bottom > p.top + m;
+}
+
+// Self-correcting placement: the panel lives in the column's normal flow, and
+// this check runs on player resize + a 1s tick. If YouTube reflows and the
+// panel ends up over the video, re-anchor it into the live column; if it STILL
+// overlaps after that, hide it — covering the video is the one unacceptable
+// state. ponytail: geometry check over layout events; YouTube reflows with no
+// event we can hook.
+function ensurePlacement() {
+  const host = document.getElementById(HOST_ID) as HTMLElement | null;
+  if (!host) return;
+  sizeToVideo(host);
+  if (!overlapsPlayer(host)) {
+    host.style.visibility = "";
+    return;
+  }
+  const secondary = activeSecondary();
+  if (secondary && !secondary.contains(host)) secondary.prepend(host); // DOM move keeps React state
+  host.style.visibility = overlapsPlayer(host) ? "hidden" : "";
+}
+
+// Reposition the instant the player resizes (theater toggle, window drag)
+// instead of waiting for the next tick.
+const playerObserver = new ResizeObserver(ensurePlacement);
+function observePlayer() {
+  playerObserver.disconnect();
+  const p = player();
+  if (p) playerObserver.observe(p);
 }
 
 type Props = { segments: Segment[] | null; transcriptError?: string; videoId: string };
@@ -35,14 +81,13 @@ function renderPanel(props: Props) {
 
 function ensureMounted(): boolean {
   if (document.getElementById(HOST_ID)) return true;
-
-  const secondary =
-    document.querySelector("ytd-watch-flexy #secondary") ||
-    document.querySelector("#secondary");
+  const secondary = activeSecondary();
   if (!secondary) return false; // not ready yet — caller retries
 
   const host = document.createElement("div");
   host.id = HOST_ID;
+  // Normal flow inside the column — integrated above the recommendations, so
+  // it pushes them down instead of floating over them.
   host.style.cssText = "display:block;margin-bottom:16px;";
   // Keyboard events from our inputs are `composed` and bubble to YouTube's
   // document handlers (space/k/j/arrows = video commands). Stop them at the
@@ -61,10 +106,11 @@ function ensureMounted(): boolean {
   // Sticky, pinned to the top of the column. Height capped via --vrs-max.
   container.style.cssText = "position:sticky;top:16px;";
   shadow.appendChild(container);
-  containerEl = container;
 
   secondary.prepend(host); // very top of the recommendations column
   root = createRoot(container);
+  observePlayer();
+  ensurePlacement();
   return true;
 }
 
@@ -99,8 +145,9 @@ async function refresh() {
   transcriptObserver?.disconnect();
   const vid = currentVideoId();
   renderPanel({ segments: null, videoId: vid }); // loading state
-  sizeToVideo();
-  setTimeout(sizeToVideo, 1200);
+  observePlayer(); // SPA nav can swap the player element out
+  ensurePlacement();
+  setTimeout(ensurePlacement, 1200); // layout settles late on cold loads
   try {
     const segments = await fetchTranscript();
     if (currentVideoId() === vid) renderPanel({ segments, videoId: vid });
@@ -119,9 +166,9 @@ async function refresh() {
 function unmount() {
   transcriptObserver?.disconnect();
   transcriptObserver = null;
+  playerObserver.disconnect();
   root?.unmount();
   root = null;
-  containerEl = null;
   document.getElementById(HOST_ID)?.remove();
 }
 
@@ -135,12 +182,37 @@ function mountWithRetry(tries = 20) {
   if (onWatchPage() && tries > 0) setTimeout(() => mountWithRetry(tries - 1), 300);
 }
 
-// YouTube is a SPA — it fires this instead of a full reload between videos.
-window.addEventListener("yt-navigate-finish", () => {
+function handlePossibleVideoNavigation() {
   if (onWatchPage()) mountWithRetry();
   else unmount();
+}
+
+// YouTube is a SPA — it fires this instead of a full reload between videos.
+window.addEventListener("yt-navigate-finish", handlePossibleVideoNavigation);
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "youtube-video") handlePossibleVideoNavigation();
 });
 
-window.addEventListener("resize", sizeToVideo);
+window.addEventListener("resize", ensurePlacement);
+
+// Fallback for cases where YouTube or Chrome misses an expected navigation
+// signal. Cheap URL polling is boring, but it makes SPA navigation resilient.
+setInterval(() => {
+  if (location.href !== lastSeenUrl) {
+    lastSeenUrl = location.href;
+    handlePossibleVideoNavigation();
+    chrome.runtime.sendMessage({ type: "wake" }).catch(() => {});
+    return;
+  }
+  // Backstop for reflows that fire no event at all.
+  if (!root || !onWatchPage()) return;
+  if (!document.getElementById(HOST_ID)) {
+    unmount(); // something removed our host
+    mountWithRetry();
+    return;
+  }
+  ensurePlacement();
+}, 1000);
 
 if (onWatchPage()) mountWithRetry();

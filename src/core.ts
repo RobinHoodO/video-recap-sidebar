@@ -2,7 +2,7 @@
 // prompt building, parsing, and provider calls (service-worker side).
 
 // ── Settings ─────────────────────────────────────────────────────────────────
-export type Provider = "openai" | "anthropic" | "openrouter";
+export type Provider = "openai" | "anthropic" | "openrouter" | "freellmapi";
 
 export type Settings = {
   focus: string;
@@ -22,12 +22,21 @@ export type Settings = {
 
 // Instruction placed above the transcript when sending to Gemini Canvas.
 export const DEFAULT_GEMINI_PROMPT =
-  "Outline the framework taught in this talk as a nested outline, then a 4-6 sentence summary. Use markdown headings.";
+  "Analyze the entire transcript and extract the complete framework taught in this talk. Start with a concise overview, then produce a deeply structured nested outline of all major concepts, steps, distinctions, workflows, examples, and practical actions. Use markdown headings.";
 
 // Build-time defaults, baked in by Vite from the gitignored .env so keys/secrets
 // survive a full "Remove + Load unpacked" (which wipes chrome.storage). Stored
 // settings still override these, so editing a value in ⚙ persists as normal.
-const ENV = import.meta.env as Record<string, string | undefined>;
+// ponytail: `?? {}` guards plain-node imports (e.g. this file's own test),
+// where import.meta.env isn't injected the way Vite injects it at build time.
+const ENV = (import.meta.env ?? {}) as Record<string, string | undefined>;
+export const DEFAULT_PROVIDER_KEYS: Record<Provider, string> = {
+  openai: ENV.VITE_OPENAI_KEY ?? "",
+  anthropic: ENV.VITE_ANTHROPIC_KEY ?? "",
+  openrouter: ENV.VITE_OPENROUTER_KEY ?? "",
+  freellmapi: ENV.VITE_FREELLMAPI_KEY ?? "",
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   focus: "Insightful",
   format: "List",
@@ -35,9 +44,11 @@ export const DEFAULT_SETTINGS: Settings = {
   emojis: true,
   highlights: true,
   grouped: true,
-  provider: "openai",
-  model: "gpt-4o-mini",
-  apiKey: ENV.VITE_OPENAI_KEY ?? "",
+  provider: "freellmapi",
+  // "auto/best-chat", NOT plain "auto": plain auto walks OmniRoute's free tier,
+  // which the grown fleet exhausts daily → 403/413/429 provider cascade.
+  model: "auto/best-chat",
+  apiKey: DEFAULT_PROVIDER_KEYS.freellmapi,
   language: "English",
   apifyToken: ENV.VITE_APIFY_TOKEN ?? "",
   geminiPrompt: DEFAULT_GEMINI_PROMPT,
@@ -45,8 +56,22 @@ export const DEFAULT_SETTINGS: Settings = {
   librarianSecret: ENV.VITE_LIBRARIAN_SECRET ?? "",
 };
 
+// Merge stored settings over defaults, migrating values that predate the
+// OmniRoute graduation (2026-07-30): plain "auto" walks the free tier that the
+// grown fleet exhausts daily (403/413/429 cascade), and "freellmapi-…" keys
+// belong to the retired freellmapi service.
+export function mergeSettings(stored?: Partial<Settings>): Settings {
+  const s = { ...DEFAULT_SETTINGS, ...stored };
+  if (s.provider !== "freellmapi") return s;
+  return {
+    ...s,
+    model: s.model === "auto" ? "auto/best-chat" : s.model,
+    apiKey: s.apiKey.startsWith("freellmapi-") ? DEFAULT_PROVIDER_KEYS.freellmapi : s.apiKey,
+  };
+}
+
 // Hermes gateway "Send to Librarian" webhook — ingests the page into the wiki.
-export const LIBRARIAN_WEBHOOK_URL = "http://127.0.0.1:8644/webhooks/librarian-ingest";
+export const LIBRARIAN_WEBHOOK_URL = "https://hetzner.tail9908c7.ts.net:8644/webhooks/librarian-ingest";
 
 // MV3 service workers terminate after ~30s idle. The first message to a
 // sleeping worker can reject with "Could not establish connection / Receiving
@@ -561,9 +586,15 @@ export type LlmKind = "summary" | "timestamped" | "ask";
 
 // ── Prompt building ──────────────────────────────────────────────────────────
 const countHint: Record<string, string> = {
-  Short: "3 concise items",
-  Auto: "4 to 6 items",
-  Detailed: "8 to 10 items",
+  Short: "Cover the core arc in 6 to 8 substantive items",
+  Auto: "Identify every major idea across the whole transcript; usually 10 to 18 items, but use as many as the material genuinely needs",
+  Detailed: "Create a comprehensive breakdown of all main points and meaningful subpoints; usually 18 to 30 items for long talks, and never stop at six by default",
+};
+
+const timestampCountHint: Record<string, string> = {
+  Short: "6 to 8 timestamped entries covering the full arc",
+  Auto: "one timestamped entry for every major section, transition, concept, example, or argument in the whole transcript; usually 10 to 18 entries",
+  Detailed: "a dense timestamp map of the entire video, including all major points and meaningful subpoints; usually 18 to 30 entries for long talks",
 };
 
 function summaryPrompt(transcript: string, s: Settings): { system: string; user: string } {
@@ -576,13 +607,17 @@ function summaryPrompt(transcript: string, s: Settings): { system: string; user:
 - "heading" names the overall framework.
 - "bullets" must be an empty array [].
 - "markdown" must contain a comprehensive, exhaustive, and beautifully formatted markdown document of the framework.
+- Analyze the full transcript before writing. Do not summarize only the opening or most obvious ideas.
+- Do not cap the output at six bullets. Include every main concept, step, distinction, loop, example, tool, warning, and practical implication that is materially taught.
+- Prefer depth and completeness over brevity. Long technical talks should produce a long framework.
 
 Structure the "markdown" field with the following sections and formatting:
 1. **Introduction / Meta-Overview**: A concise paragraph summarizing the high-level context, strategic value of the framework, and what the reader will learn.
 2. **Core Concepts / Philosophy (The Duality & Taxonomy Principle)**: Deeply break down the main paradigms, contrasting philosophies, or conceptual categories (e.g., Tactical vs. Strategic, Model vs. Harness, Procedures vs. Abilities) using bold headers, bullet lists, and clear explanations.
 3. **The Visual Workflow (The Flow Principle)**: Construct a clean, highly readable Unicode/ASCII flowchart diagram mapping out the logical queue, steps, pipeline, or loops discussed. Wrap this diagram in a markdown code block (using \`\`\` text ... \`\`\`).
-4. **Tooling & Technical Stack**: If specific tools, environments, safety protocols, or configurations were mentioned, detail them concretely.
-5. **Practical Action Steps**: Conclude with a section titled "### Practical Action Steps" listing 3-5 concrete, step-by-step actions that a developer can take today to get started.
+4. **Detailed Framework Map**: List all major pillars, steps, mechanisms, patterns, and examples in order. Use nested bullets where needed.
+5. **Tooling & Technical Stack**: If specific tools, environments, safety protocols, or configurations were mentioned, detail them concretely.
+6. **Practical Action Steps**: Conclude with a section titled "### Practical Action Steps" listing concrete, step-by-step actions that a developer can take today to get started.
 
 Formatting constraints inside "markdown":
 - Use standard markdown headers (###, ####) for sections.
@@ -604,7 +639,10 @@ ${transcript}`,
   return {
     system: `You summarize YouTube talks into a tight recap. Emphasize ${s.focus.toLowerCase()} points. Respond in ${s.language}. Return ONLY valid JSON, no markdown fences.`,
     user: `From this transcript, produce a recap as JSON of the shape {"heading": string, "bullets": [{"emoji": string, "text": string}]}.
-- ${countHint[s.count] || "4 to 6 items"}.
+- First analyze the entire transcript and identify the complete set of main points.
+- ${countHint[s.count] || countHint.Auto}.
+- Do not default to six bullets. If the talk contains more major points, include them.
+- Each bullet should capture one distinct main point, argument, example, or practical takeaway.
 - ${fmt}
 - ${emoji}
 - ${hl}
@@ -620,8 +658,10 @@ function timestampedPrompt(transcript: string, s: Settings): { system: string; u
     system: `You create timestamped summaries of YouTube talks. Respond in ${s.language}. Return ONLY valid JSON, no markdown fences.`,
     user: `Using the timestamps already present in the transcript (format [m:ss] or [h:mm:ss]), produce JSON {"intro": string, "items": [{"t": string, "text": string}]}.
 - "intro" is a 1-2 sentence overview.
-- ${countHint[s.count] || "4 to 6 items"}, each anchored to a real timestamp from the transcript.
+- ${timestampCountHint[s.count] || timestampCountHint.Auto}, each anchored to a real timestamp from the transcript.
+- Cover the whole video from beginning to end. Do not stop after six entries when more major points exist.
 - "t" must be a timestamp copied from the transcript.
+- "text" should explain what starts or changes at that point, not merely label the section.
 
 TRANSCRIPT:
 ${transcript}`,
@@ -655,9 +695,14 @@ export function parseJsonLoose<T>(raw: string): T {
     const lastBrace = cleaned.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
+    } else {
+      // No braces anywhere (e.g. a truncated/degenerate completion that's just
+      // a stray ``` fence marker) — surface the actual model output instead of
+      // letting JSON.parse throw an opaque "Unexpected token" error.
+      throw new Error(`Model returned no JSON (got: "${cleaned.slice(0, 120)}${cleaned.length > 120 ? "…" : ""}")`);
     }
   }
-  
+
   return JSON.parse(cleaned) as T;
 }
 
@@ -681,7 +726,7 @@ export async function callLLM(
       },
       body: JSON.stringify({
         model: s.model,
-        max_tokens: 1800,
+        max_tokens: wantJson ? 5000 : 1200,
         system,
         messages: [{ role: "user", content: user }],
       }),
@@ -691,11 +736,16 @@ export async function callLLM(
     return data.content?.map((b: any) => b.text).join("") ?? "";
   }
 
-  // OpenAI-compatible: OpenAI and OpenRouter share the same request shape.
+  // OpenAI-compatible: OpenAI, OpenRouter, and OmniRoute (Hetzner, tailnet)
+  // share the same request shape. OmniRoute routes to free providers with
+  // model="auto"; reached directly over Tailscale, no local tunnel needed.
   const isOR = s.provider === "openrouter";
-  const url = isOR
-    ? "https://openrouter.ai/api/v1/chat/completions"
-    : "https://api.openai.com/v1/chat/completions";
+  const isFree = s.provider === "freellmapi";
+  const url = isFree
+    ? "http://100.114.219.63:20128/v1/chat/completions"
+    : isOR
+      ? "https://openrouter.ai/api/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
   const headers: Record<string, string> = {
     "content-type": "application/json",
     authorization: `Bearer ${s.apiKey}`,
@@ -710,6 +760,8 @@ export async function callLLM(
     body: JSON.stringify({
       model: s.model,
       temperature: 0.4,
+      max_tokens: isFree && wantJson ? 10000 : wantJson ? 5000 : 1200,
+      stream: false,
       ...(wantJson ? { response_format: { type: "json_object" } } : {}),
       messages: [
         { role: "system", content: system },
@@ -717,7 +769,16 @@ export async function callLLM(
       ],
     }),
   });
-  if (!res.ok) throw new Error(`${isOR ? "OpenRouter" : "OpenAI"} error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const label = isFree ? "FreeLLMAPI" : isOR ? "OpenRouter" : "OpenAI";
+  if (!res.ok) {
+    // OmniRoute's free pool gets drained daily by the grown fleet; when the
+    // best-chat walk dies (429/5xx cascade), retry once on the lighter combo —
+    // same primary→fallback pairing the rest of the fleet uses.
+    if (isFree && s.model === "auto/best-chat") {
+      return callLLM({ ...s, model: "auto/best-fast" }, system, user, wantJson);
+    }
+    throw new Error(`${label} error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  }
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
 }

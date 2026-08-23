@@ -14,5 +14,6 @@
     "strict": true,
     "types": ["chrome", "vite/client"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["src/core.test.ts"]
 }

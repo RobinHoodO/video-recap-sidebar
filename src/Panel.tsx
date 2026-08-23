@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import {
   DEFAULT_SETTINGS,
   DEFAULT_GEMINI_PROMPT,
+  DEFAULT_PROVIDER_KEYS,
   fmtTime,
+  mergeSettings,
   parseTime,
   transcriptToText,
   sendToWorker,
@@ -43,16 +45,19 @@ const PROVIDER_DEFAULT_MODEL: Record<Provider, string> = {
   openai: "gpt-4o-mini",
   anthropic: "claude-3-5-haiku-latest",
   openrouter: "openai/gpt-4o-mini",
+  freellmapi: "auto/best-chat",
 };
 const PROVIDER_LABEL: Record<Provider, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   openrouter: "OpenRouter",
+  freellmapi: "FreeLLMAPI",
 };
 const PROVIDER_KEY_HINT: Record<Provider, string> = {
   openai: "sk-… (OpenAI API key)",
   anthropic: "sk-ant-… (Anthropic key)",
   openrouter: "sk-or-… (OpenRouter key)",
+  freellmapi: "sk-… (OmniRoute consumer key)",
 };
 
 // ── Style helpers ────────────────────────────────────────────────────────────
@@ -238,10 +243,13 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   // Load persisted settings once.
   useEffect(() => {
     chrome.storage.local.get("settings").then((got) => {
-      const merged = { ...DEFAULT_SETTINGS, ...(got.settings as Partial<Settings> | undefined) };
+      const merged = mergeSettings(got.settings as Partial<Settings> | undefined);
       setSettings(merged);
       setSettingsLoaded(true);
-      if (!got.settings) chrome.storage.local.set({ settings: merged });
+      // Persist when missing OR when migration changed a stale stored value.
+      if (JSON.stringify(got.settings ?? null) !== JSON.stringify(merged)) {
+        chrome.storage.local.set({ settings: merged });
+      }
     });
   }, []);
 
@@ -296,14 +304,46 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(""), 2800);
   };
+  const onRegenerate = () => {
+    if (!segments) return showToast(transcriptError || "No transcript yet");
+    if (!hasKey) { setSettingsOpen(true); return; }
+    if (tab === "timestamped") {
+      showToast("Regenerating timestamped summary...");
+      generate("timestamped");
+      return;
+    }
+    if (tab === "summary") {
+      showToast("Regenerating summary...");
+      generate("summary");
+      return;
+    }
+    showToast("Switch to Summary or Timestamped to regenerate");
+  };
   const onCopy = () => { if (transcriptText) navigator.clipboard?.writeText(transcriptText).catch(() => {}); showToast(transcriptText ? "Transcript copied" : "No transcript yet"); };
   const onShare = () => showToast("Share link copied");
-  const onGemini = () => {
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard?.writeText(text);
+      return true;
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    }
+  };
+  const onGemini = async () => {
     if (!transcriptText) return showToast("No transcript yet");
     const prompt = `${settings.geminiPrompt || DEFAULT_GEMINI_PROMPT}\n\n--- TRANSCRIPT ---\n${transcriptText}`;
-    navigator.clipboard?.writeText(prompt).catch(() => {});
+    await chrome.storage.local.set({ geminiPendingFrameworkPrompt: { prompt, createdAt: Date.now() } });
+    await copyText(prompt);
     window.open("https://gemini.google.com/app", "_blank");
-    showToast("Transcript + prompt copied — paste into Gemini");
+    showToast("Opening Gemini Canvas with transcript…");
   };
   const onLibrarian = async () => {
     if (!transcriptText) return showToast("No transcript yet");
@@ -367,6 +407,7 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={iconBtn} onClick={onRegenerate} title="Regenerate the active LLM summary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2" /><path d="M3 12A9 9 0 0 1 18.5 5.8" /><path d="M18.5 2v3.8H22" /><path d="M5.5 22v-3.8H2" /></svg></div>
           <div style={iconBtn} onClick={onCopy}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></div>
           <div style={iconBtn} onClick={onShare}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3" /><path d="M8 7l4-4 4 4" /><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></div>
           <div style={iconBtn} onClick={onLibrarian} title="Send to Librarian — file the full transcript into the wiki"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg></div>
@@ -403,13 +444,13 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
             </div>
             <div style={{ ...label, margin: "26px 0 12px" }}>AI MODEL</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-              {(["openai", "anthropic", "openrouter"] as Provider[]).map((p) => (
-                <div key={p} style={segStyle(settings.provider === p)} onClick={() => update({ provider: p, model: PROVIDER_DEFAULT_MODEL[p] })}>{PROVIDER_LABEL[p]}</div>
+              {(["openai", "anthropic", "openrouter", "freellmapi"] as Provider[]).map((p) => (
+                <div key={p} style={segStyle(settings.provider === p)} onClick={() => update({ provider: p, model: PROVIDER_DEFAULT_MODEL[p], apiKey: DEFAULT_PROVIDER_KEYS[p] || settings.apiKey })}>{PROVIDER_LABEL[p]}</div>
               ))}
             </div>
-            <input style={{ ...inputStyle, marginBottom: 10 }} value={settings.model} onChange={(e) => update({ model: e.target.value })} placeholder={settings.provider === "openrouter" ? "e.g. anthropic/claude-3.5-sonnet" : "model id"} />
+            <input style={{ ...inputStyle, marginBottom: 10 }} value={settings.model} onChange={(e) => update({ model: e.target.value })} placeholder={settings.provider === "openrouter" ? "e.g. anthropic/claude-3.5-sonnet" : settings.provider === "freellmapi" ? "auto/best-chat" : "model id"} />
             <input style={inputStyle} type="password" value={settings.apiKey} onChange={(e) => update({ apiKey: e.target.value })} placeholder={PROVIDER_KEY_HINT[settings.provider]} />
-            <div style={{ color: "#6f6f6f", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>Stored locally in this browser only. Calls go straight from the extension to {PROVIDER_LABEL[settings.provider]}.{settings.provider === "openrouter" ? " Use any model id from openrouter.ai/models." : ""}</div>
+            <div style={{ color: "#6f6f6f", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>Stored locally in this browser only. Calls go straight from the extension to {PROVIDER_LABEL[settings.provider]}.{settings.provider === "openrouter" ? " Use any model id from openrouter.ai/models." : ""}{settings.provider === "freellmapi" ? " Routes over Tailscale to OmniRoute on Hetzner; model auto uses the router." : ""}</div>
             <div style={{ ...label, margin: "26px 0 12px" }}>TRANSCRIPT FALLBACK</div>
             <input style={inputStyle} type="password" value={settings.apifyToken} onChange={(e) => update({ apifyToken: e.target.value })} placeholder="Apify API token (optional)" />
             <div style={{ color: "#6f6f6f", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>Only used when YouTube blocks the in-page transcript (gated captions). Get a token at apify.com — ~$0.50 per 1k transcripts. Stored locally.</div>

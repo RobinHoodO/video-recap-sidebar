@@ -1,7 +1,7 @@
 {
   "name": "video-recap-sidebar",
   "version": "0.1.0",
-  "description": "YouTube video-recap sidebar \u2014 Chrome extension (MV3).",
+  "description": "YouTube video-recap sidebar — Chrome extension (MV3).",
   "type": "module",
   "scripts": {
     "dev": "node scripts/vite.mjs",

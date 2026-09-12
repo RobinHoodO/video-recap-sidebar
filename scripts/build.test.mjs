@@ -44,3 +44,11 @@ test('npm build resolves .env before bundling a standalone production extension'
   assert.ok(!bundle.includes('localhost:5173'), 'production must work with dev server stopped');
   assert.ok(!bundle.includes('@crx/client-worker'), 'production must not depend on CRX development worker');
 });
+
+test('the launcher preserves child termination instead of reporting success', () => {
+  const bin = join(fixture, 'bin');
+  writeFileSync(join(bin, 'vite'), '#!/bin/sh\nkill -TERM $$\n', { mode: 0o755 });
+  const result = run(['scripts/vite.mjs', 'build'], { PATH: `${bin}:${env.PATH}` });
+  assert.equal(result.signal, 'SIGTERM');
+  assert.equal(result.status, null);
+});

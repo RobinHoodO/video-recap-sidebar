@@ -3,7 +3,7 @@ import { test, after } from 'node:test';
 import { mkdtempSync, cpSync, symlinkSync, writeFileSync, readFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const fixture = mkdtempSync(join(tmpdir(), 'video-recap-build-'));
 for (const path of ['src', 'scripts', 'package.json', 'vite.config.ts']) cpSync(path, join(fixture, path), { recursive: true });
@@ -11,7 +11,7 @@ symlinkSync(resolve('node_modules'), join(fixture, 'node_modules'));
 after(() => rmSync(fixture, { recursive: true, force: true }));
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('VITE_')));
 env.HOME = fixture;
-const configRunner = `import { loadConfigFromFile } from 'vite'; const r = await loadConfigFromFile({command: process.argv[1], mode: 'production'}); console.log(JSON.stringify(r.config.build ?? { outDir: 'dist' }));`;
+const configRunner = `import { loadConfigFromFile } from 'vite'; const r = await loadConfigFromFile({command: process.argv[1], mode: 'production', isPreview: process.argv[2] === 'preview'}); console.log(JSON.stringify(r.config.build ?? { outDir: 'dist' }));`;
 const run = (args, extra = {}) => spawnSync(process.execPath, args, { cwd: fixture, env: { ...env, ...extra }, encoding: 'utf8' });
 
 test('development output cannot overwrite the installed production extension', () => {
@@ -19,7 +19,11 @@ test('development output cannot overwrite the installed production extension', (
   const prod = run(['--input-type=module', '-e', configRunner, 'build']);
   assert.equal(dev.status, 0, dev.stderr);
   assert.equal(prod.status, 0, prod.stderr);
-  assert.notEqual(JSON.parse(dev.stdout).outDir, JSON.parse(prod.stdout).outDir);
+  assert.equal(JSON.parse(dev.stdout).outDir, 'dist-dev');
+  assert.equal(JSON.parse(prod.stdout).outDir, 'dist');
+  const preview = run(['--input-type=module', '-e', configRunner, 'serve', 'preview']);
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.equal(JSON.parse(preview.stdout).outDir, 'dist');
 });
 
 test('direct Vite invocation rejects unresolved secret references by key name', () => {
@@ -51,4 +55,38 @@ test('the launcher preserves child termination instead of reporting success', ()
   const result = run(['scripts/vite.mjs', 'build'], { PATH: `${bin}:${env.PATH}` });
   assert.equal(result.signal, 'SIGTERM');
   assert.equal(result.status, null);
+});
+
+
+test('npm preview serves the production bundle with a 1Password-backed .env', async () => {
+  const bin = join(fixture, 'bin');
+  // Remove the termination-test stub so npm resolves the real Vite binary.
+  rmSync(join(bin, 'vite'), { force: true });
+  const child = spawn('npm', ['run', 'preview', '--', '--outDir', join(fixture, 'production'), '--host', '127.0.0.1', '--port', '0'], {
+    cwd: fixture, env: { ...env, PATH: `${bin}:${env.PATH}` }, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let log = '';
+  let timer;
+  try {
+    const url = await new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('Preview did not become ready')), 10000);
+      child.on('error', reject);
+      child.on('exit', code => reject(new Error(`Preview exited with ${code}: ${log}`)));
+      const collect = chunk => {
+        log += chunk;
+        const match = log.match(/http:\/\/127\.0\.0\.1:\d+\//);
+        if (match) resolve(match[0]);
+      };
+      child.stdout.on('data', collect);
+      child.stderr.on('data', collect);
+    });
+    const response = await fetch(new URL('manifest.json', url));
+    assert.equal(response.status, 200);
+    const manifest = await response.json();
+    assert.equal(manifest.name, 'Video Recap Sidebar');
+    assert.ok(manifest.background.service_worker);
+  } finally {
+    clearTimeout(timer);
+    try { process.kill(-child.pid, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') throw err; }
+  }
 });

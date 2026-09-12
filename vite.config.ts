@@ -25,16 +25,18 @@ const manifest = defineManifest({
   ],
 });
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   const env = loadEnv(mode, ".", "VITE_");
   const unresolved = Object.keys(env).filter(key => env[key].trim().startsWith("op://"));
   if (unresolved.length) {
     throw new Error(`Unresolved 1Password references: ${unresolved.join(", ")}. Start with npm run dev or npm run build through oprun.`);
   }
   return {
-    plugins: [react(), crx({ manifest })],
+    // CRX's serve hook empties outDir, even during preview. Preview only
+    // serves an existing production bundle and must not run that writer.
+    plugins: [react(), ...(isPreview ? [] : [crx({ manifest })])],
     // CRX development output depends on a running Vite server. Keep it away
     // from the production extension Chrome loads between development sessions.
-    build: { outDir: command === "serve" ? "dist-dev" : "dist", emptyOutDir: true },
+    build: { outDir: command === "serve" && !isPreview ? "dist-dev" : "dist", emptyOutDir: true },
   };
 });

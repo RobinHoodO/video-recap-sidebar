@@ -27,7 +27,10 @@ const manifest = defineManifest({
 
 export default defineConfig(({ command, mode, isPreview }) => {
   const env = loadEnv(mode, ".", "VITE_");
-  const unresolved = Object.keys(env).filter(key => env[key].trim().startsWith("op://"));
+  const unresolved = Object.keys(env).filter(key => {
+    const value = env[key].trim().replace(/^(['"])([\s\S]*)\1$/, "$2").trim();
+    return value.startsWith("op://");
+  });
   if (unresolved.length) {
     throw new Error(`Unresolved 1Password references: ${unresolved.join(", ")}. Start with npm run dev or npm run build through oprun.`);
   }

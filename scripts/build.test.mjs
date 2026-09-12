@@ -28,10 +28,12 @@ test('development output cannot overwrite the installed production extension', (
 });
 
 test('direct Vite invocation rejects unresolved secret references by key name', () => {
-  const result = run(['--input-type=module', '-e', configRunner, 'build'], { VITE_OPENAI_KEY: 'op://fixture/item/key' });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /VITE_OPENAI_KEY/);
-  assert.doesNotMatch(result.stderr, /op:\/\/fixture/);
+  for (const reference of ['op://fixture/item/key', '  op://fixture/item/key  ', '"op://fixture/item/key"', "'op://fixture/item/key'", '  " op://fixture/item/key "  ']) {
+    const result = run(['--input-type=module', '-e', configRunner, 'build'], { VITE_OPENAI_KEY: reference });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /VITE_OPENAI_KEY/);
+    assert.doesNotMatch(result.stderr, /op:\/\/fixture/);
+  }
 });
 
 test('npm build resolves .env before bundling a standalone production extension', () => {

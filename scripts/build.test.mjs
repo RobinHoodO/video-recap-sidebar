@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { mkdtempSync, cpSync, symlinkSync, writeFileSync, readFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
+import { stripVTControlCharacters } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -69,12 +70,12 @@ test('npm preview serves the production bundle with a 1Password-backed .env', as
   let timer;
   try {
     const url = await new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('Preview did not become ready')), 10000);
+      timer = setTimeout(() => reject(new Error(`Preview did not become ready: ${stripVTControlCharacters(log)}`)), 10000);
       child.on('error', reject);
       child.on('exit', code => reject(new Error(`Preview exited with ${code}: ${log}`)));
       const collect = chunk => {
         log += chunk;
-        const match = log.match(/http:\/\/127\.0\.0\.1:\d+\//);
+        const match = stripVTControlCharacters(log).match(/http:\/\/127\.0\.0\.1:\d+\//);
         if (match) resolve(match[0]);
       };
       child.stdout.on('data', collect);

@@ -1,13 +1,14 @@
 {
   "name": "video-recap-sidebar",
   "version": "0.1.0",
-  "description": "YouTube video-recap sidebar — Chrome extension (MV3).",
+  "description": "YouTube video-recap sidebar \u2014 Chrome extension (MV3).",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node scripts/vite.mjs",
+    "build": "node scripts/vite.mjs build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test scripts/build.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

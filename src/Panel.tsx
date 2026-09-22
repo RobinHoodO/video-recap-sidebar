@@ -387,6 +387,13 @@ export default function Panel({ segments, transcriptError, videoId, videoTitle, 
     try {
       const conversation = await Conversation.startSession({
         signedUrl: r.data.signedUrl,
+        // YouTube's CSP blocks the SDK's default blob:/data: worklet loads;
+        // self-hosted copies ship under public/worklets/ (see vite.config.ts).
+        workletPaths: {
+          rawAudioProcessor: chrome.runtime.getURL("worklets/rawAudioProcessor.js"),
+          audioConcatProcessor: chrome.runtime.getURL("worklets/audioConcatProcessor.js"),
+        },
+        libsampleratePath: chrome.runtime.getURL("worklets/libsamplerate.worklet.js"),
         dynamicVariables: {
           video_title: videoTitle,
           video_channel: videoChannel,

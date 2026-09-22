@@ -17,6 +17,15 @@ const manifest = defineManifest({
     "http://100.114.219.63:20128/*",
   ],
   background: { service_worker: "src/background.ts", type: "module" },
+  // ElevenLabs' voice SDK loads its AudioWorklets from blob:/data: URLs by
+  // default, which YouTube's CSP blocks. Self-hosted copies ship under
+  // public/worklets/ instead (see workletPaths in Panel.tsx).
+  web_accessible_resources: [
+    {
+      resources: ["worklets/*.js"],
+      matches: ["https://www.youtube.com/*"],
+    },
+  ],
   content_scripts: [
     {
       matches: ["https://www.youtube.com/*"],

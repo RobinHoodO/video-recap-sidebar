@@ -68,13 +68,28 @@ function observePlayer() {
   if (p) playerObserver.observe(p);
 }
 
-type Props = { segments: Segment[] | null; transcriptError?: string; videoId: string };
+type Props = {
+  segments: Segment[] | null;
+  transcriptError?: string;
+  videoId: string;
+  videoTitle: string;
+  videoChannel: string;
+};
 
-function renderPanel(props: Props) {
+// Best-effort video metadata for the voice agent's dynamic variables. Reads
+// straight from YouTube's own DOM — no API call, no extra permission.
+function videoMeta(): { title: string; channel: string } {
+  const title = document.title.replace(/\s*-\s*YouTube$/, "");
+  const channel = document.querySelector("ytd-channel-name#channel-name a")?.textContent?.trim() ?? "";
+  return { title, channel };
+}
+
+function renderPanel(props: Omit<Props, "videoTitle" | "videoChannel">) {
+  const { title, channel } = videoMeta();
   // Keyed by videoId so the panel resets cleanly when the video changes.
   root?.render(
     <StrictMode>
-      <Panel key={props.videoId} {...props} />
+      <Panel key={props.videoId} {...props} videoTitle={title} videoChannel={channel} />
     </StrictMode>
   );
 }

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Conversation } from "@elevenlabs/client";
 import {
   DEFAULT_SETTINGS,
   DEFAULT_GEMINI_PROMPT,
   DEFAULT_PROVIDER_KEYS,
+  buildVoiceTranscript,
   fmtTime,
   mergeSettings,
   parseTime,
@@ -16,6 +18,8 @@ import {
   type SummaryResult,
   type TimestampedResult,
 } from "./core";
+
+type VoiceState = "idle" | "connecting" | "listening" | "speaking" | "ended";
 
 const ACCENT = "#f1581f";
 
@@ -215,7 +219,7 @@ function TypingDots() {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
-export default function Panel({ segments, transcriptError }: { segments: Segment[] | null; transcriptError?: string; videoId: string }) {
+export default function Panel({ segments, transcriptError, videoId, videoTitle, videoChannel }: { segments: Segment[] | null; transcriptError?: string; videoId: string; videoTitle: string; videoChannel: string }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>("summary");
@@ -228,6 +232,9 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
   const [toast, setToast] = useState("");
   const [comments, setComments] = useState<CommentItem[] | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [voiceError, setVoiceError] = useState("");
+  const conversationRef = useRef<Conversation | null>(null);
 
   // Read YouTube's rendered comments when the tab is first opened. null = not
   // attempted; [] = attempted but none loaded (user hasn't scrolled to them).
@@ -353,6 +360,60 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
     showToast(r?.ok ? "Sent to Librarian ✓ — filing into the wiki" : `⚠ ${r?.error || "Failed to send"}`);
   };
 
+  // Cleans up the live call when the video changes or the panel unmounts
+  // (Panel is keyed by videoId in content.tsx, so this fires on video swap too).
+  useEffect(() => {
+    return () => { conversationRef.current?.endSession().catch(() => {}); };
+  }, []);
+
+  const onTalk = async () => {
+    if (voiceState === "connecting" || voiceState === "listening" || voiceState === "speaking") {
+      await conversationRef.current?.endSession().catch(() => {});
+      conversationRef.current = null;
+      setVoiceState("ended");
+      return;
+    }
+    setVoiceError("");
+    setVoiceState("connecting");
+    const r = await sendToWorker<{ ok: true; data: { signedUrl: string } } | { ok: false; error: string }>({ type: "voice-signed-url" });
+    if (!r?.ok) {
+      setVoiceState("idle");
+      setVoiceError(r?.error || "Could not start the voice call.");
+      return;
+    }
+    const summaryText = summary.data?.markdown
+      ?? summary.data?.bullets?.map((b) => `${b.emoji} ${b.text}`).join("\n")
+      ?? "";
+    try {
+      const conversation = await Conversation.startSession({
+        signedUrl: r.data.signedUrl,
+        // YouTube's CSP blocks the SDK's default blob:/data: worklet loads;
+        // self-hosted copies ship under public/worklets/ (see vite.config.ts).
+        workletPaths: {
+          rawAudioProcessor: chrome.runtime.getURL("worklets/rawAudioProcessor.js"),
+          audioConcatProcessor: chrome.runtime.getURL("worklets/audioConcatProcessor.js"),
+        },
+        libsampleratePath: chrome.runtime.getURL("worklets/libsamplerate.worklet.js"),
+        dynamicVariables: {
+          video_title: videoTitle,
+          video_channel: videoChannel,
+          video_summary: summaryText,
+          video_transcript: segments ? buildVoiceTranscript(segments) : "",
+        },
+        onStatusChange: ({ status }) => {
+          if (status === "connected") setVoiceState("listening");
+          else if (status === "disconnected") setVoiceState("ended");
+        },
+        onModeChange: ({ mode }) => setVoiceState(mode === "speaking" ? "speaking" : "listening"),
+        onError: (message) => { setVoiceError(String(message)); setVoiceState("ended"); },
+      });
+      conversationRef.current = conversation;
+    } catch (e) {
+      setVoiceState("idle");
+      setVoiceError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const send = () => {
     const q = input.trim();
     if (!q || sending || !segments) return;
@@ -411,6 +472,13 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
           <div style={iconBtn} onClick={onCopy}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></div>
           <div style={iconBtn} onClick={onShare}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3" /><path d="M8 7l4-4 4 4" /><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></div>
           <div style={iconBtn} onClick={onLibrarian} title="Send to Librarian — file the full transcript into the wiki"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg></div>
+          <div
+            style={{ ...iconBtn, color: voiceState === "idle" || voiceState === "ended" ? undefined : ACCENT }}
+            onClick={onTalk}
+            title={voiceState === "idle" || voiceState === "ended" ? "Talk to this video" : "End the call"}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
+          </div>
           {closed ? (
             <div style={iconBtn} onClick={() => setSettingsOpen(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="7" x2="21" y2="7" /><circle cx="9" cy="7" r="2.3" fill="#0a0a0a" /><line x1="3" y1="13.5" x2="21" y2="13.5" /><circle cx="15" cy="13.5" r="2.3" fill="#0a0a0a" /><line x1="3" y1="20" x2="21" y2="20" /><circle cx="7" cy="20" r="2.3" fill="#0a0a0a" /></svg></div>
           ) : (
@@ -585,6 +653,12 @@ export default function Panel({ segments, transcriptError }: { segments: Segment
           </div>
         )}
       </div>
+
+      {(voiceState !== "idle" || voiceError) && (
+        <div style={{ position: "absolute", top: 62, left: "50%", transform: "translateX(-50%)", background: voiceError ? "#3a1a1a" : "#1a2a1e", border: `1px solid ${voiceError ? "#5a2a2a" : "#2a4a30"}`, color: voiceError ? "#ff9a9a" : "#a8e0b0", padding: "6px 14px", borderRadius: 9, fontSize: 13, zIndex: 50 }}>
+          {voiceError ? `⚠ ${voiceError}` : { idle: "", connecting: "Connecting…", listening: "Listening…", speaking: "Speaking…", ended: "Call ended" }[voiceState]}
+        </div>
+      )}
 
       {toast && <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1e1e1e", border: "1px solid #383838", color: "#f0f0f0", padding: "13px 20px", borderRadius: 11, fontSize: 14.5, boxShadow: "0 8px 30px rgba(0,0,0,.5)", zIndex: 50 }}>{toast}</div>}
     </div>

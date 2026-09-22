@@ -37,6 +37,10 @@ export const DEFAULT_PROVIDER_KEYS: Record<Provider, string> = {
   freellmapi: ENV.VITE_FREELLMAPI_KEY ?? "",
 };
 
+// Not a text-LLM provider in the Provider union above — kept separate.
+export const ELEVENLABS_API_KEY = ENV.VITE_ELEVENLABS_API_KEY ?? "";
+export const ELEVENLABS_AGENT_ID = ENV.VITE_ELEVENLABS_AGENT_ID ?? "";
+
 // The retired consumer may be absent after migration. Keep a configured
 // consumer, otherwise use the OpenRouter provider/model already offered in UI.
 const USE_OPENROUTER_DEFAULT = !DEFAULT_PROVIDER_KEYS.freellmapi && !!DEFAULT_PROVIDER_KEYS.openrouter;
@@ -586,6 +590,20 @@ export function parseTime(t: string): number {
 
 export function transcriptToText(segs: Segment[]): string {
   return segs.map((s) => `[${fmtTime(s.tStartMs)}] ${s.text}`).join("\n");
+}
+
+// ponytail: ElevenLabs dynamic-variable size ceiling — keeps the voice agent's
+// prompt context bounded. Raise if the agent starts truncating relevant detail.
+export const VOICE_TRANSCRIPT_CHAR_CAP = 60_000;
+
+// Formats a transcript for the voice agent's dynamic variables, capping length.
+// Over the cap, keeps the start and end and marks the gap so the agent knows
+// context was cut rather than silently missing it.
+export function buildVoiceTranscript(segs: Segment[]): string {
+  const full = transcriptToText(segs);
+  if (full.length <= VOICE_TRANSCRIPT_CHAR_CAP) return full;
+  const half = Math.floor((VOICE_TRANSCRIPT_CHAR_CAP - 20) / 2);
+  return `${full.slice(0, half)}\n...[truncated]...\n${full.slice(full.length - half)}`;
 }
 
 // ── LLM result types ─────────────────────────────────────────────────────────

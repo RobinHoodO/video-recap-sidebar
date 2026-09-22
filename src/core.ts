@@ -37,6 +37,9 @@ export const DEFAULT_PROVIDER_KEYS: Record<Provider, string> = {
   freellmapi: ENV.VITE_FREELLMAPI_KEY ?? "",
 };
 
+// The retired consumer may be absent after migration. Keep a configured
+// consumer, otherwise use the OpenRouter provider/model already offered in UI.
+const USE_OPENROUTER_DEFAULT = !DEFAULT_PROVIDER_KEYS.freellmapi && !!DEFAULT_PROVIDER_KEYS.openrouter;
 export const DEFAULT_SETTINGS: Settings = {
   focus: "Insightful",
   format: "List",
@@ -44,11 +47,11 @@ export const DEFAULT_SETTINGS: Settings = {
   emojis: true,
   highlights: true,
   grouped: true,
-  provider: "freellmapi",
+  provider: USE_OPENROUTER_DEFAULT ? "openrouter" : "freellmapi",
   // "auto/best-chat", NOT plain "auto": plain auto walks OmniRoute's free tier,
   // which the grown fleet exhausts daily → 403/413/429 provider cascade.
-  model: "auto/best-chat",
-  apiKey: DEFAULT_PROVIDER_KEYS.freellmapi,
+  model: USE_OPENROUTER_DEFAULT ? "openai/gpt-4o-mini" : "auto/best-chat",
+  apiKey: USE_OPENROUTER_DEFAULT ? DEFAULT_PROVIDER_KEYS.openrouter : DEFAULT_PROVIDER_KEYS.freellmapi,
   language: "English",
   apifyToken: ENV.VITE_APIFY_TOKEN ?? "",
   geminiPrompt: DEFAULT_GEMINI_PROMPT,
@@ -61,8 +64,17 @@ export const DEFAULT_SETTINGS: Settings = {
 // grown fleet exhausts daily (403/413/429 cascade), and "freellmapi-…" keys
 // belong to the retired freellmapi service.
 export function mergeSettings(stored?: Partial<Settings>): Settings {
-  const s = { ...DEFAULT_SETTINGS, ...stored };
+  const s = {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    apiKey: stored?.apiKey ?? DEFAULT_PROVIDER_KEYS[stored?.provider ?? DEFAULT_SETTINGS.provider],
+  };
   if (s.provider !== "freellmapi") return s;
+  const key = s.apiKey.trim().replace(/^(['"])([\s\S]*)\1$/, "$2").trim();
+  const unusableKey = !key || key.startsWith("op://") || key.startsWith("freellmapi-");
+  if (USE_OPENROUTER_DEFAULT && unusableKey) {
+    return { ...s, provider: "openrouter", model: "openai/gpt-4o-mini", apiKey: DEFAULT_PROVIDER_KEYS.openrouter };
+  }
   return {
     ...s,
     model: s.model === "auto" ? "auto/best-chat" : s.model,

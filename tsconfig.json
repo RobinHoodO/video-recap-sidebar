@@ -12,7 +12,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["chrome", "vite/client"]
+    "types": ["chrome", "vite/client", "node"]
   },
   "include": ["src", "vite.config.ts"],
   "exclude": ["src/core.test.ts"]

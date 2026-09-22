@@ -1,6 +1,8 @@
 // Service worker: the only place the API key is used. The content-script panel
 // sends a transcript + kind; we load settings, call the provider, return data.
 import {
+  ELEVENLABS_AGENT_ID,
+  ELEVENLABS_API_KEY,
   LIBRARIAN_WEBHOOK_URL,
   buildPrompt,
   callLLM,
@@ -15,7 +17,9 @@ import {
 type LlmRequest = { type: "llm"; kind: LlmKind; transcript: string; question?: string };
 type LibrarianRequest = { type: "librarian"; title: string; url: string; text: string; selection?: string };
 type WakeRequest = { type: "wake" };
+type VoiceSignedUrlRequest = { type: "voice-signed-url" };
 type LlmResponse = { ok: true; data: unknown } | { ok: false; error: string };
+type VoiceSignedUrlResponse = { ok: true; data: { signedUrl: string } } | { ok: false; error: string };
 
 async function loadSettings(): Promise<Settings> {
   const got = await chrome.storage.local.get("settings");
@@ -57,12 +61,35 @@ async function sendToLibrarian(req: LibrarianRequest): Promise<{ ok: boolean; er
   }
 }
 
-chrome.runtime.onMessage.addListener((req: LlmRequest | LibrarianRequest | WakeRequest, _sender, sendResponse) => {
-  if (req?.type === "wake") { sendResponse({ ok: true }); return false; }
-  if (req?.type === "llm") { handle(req as LlmRequest).then(sendResponse); return true; }
-  if (req?.type === "librarian") { sendToLibrarian(req as LibrarianRequest).then(sendResponse); return true; }
-  return undefined;
-});
+// Fetches a signed WebSocket URL for the private voice agent. Done here (not
+// the content script, which runs in the youtube.com page context) so the
+// ElevenLabs API key never reaches the page.
+async function getVoiceSignedUrl(): Promise<VoiceSignedUrlResponse> {
+  if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID) {
+    return { ok: false, error: "Voice agent not configured (missing VITE_ELEVENLABS_API_KEY/AGENT_ID)." };
+  }
+  try {
+    const res = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
+      { headers: { "xi-api-key": ELEVENLABS_API_KEY } },
+    );
+    const data = (await res.json().catch(() => ({}))) as { signed_url?: string };
+    if (!res.ok || !data.signed_url) return { ok: false, error: `ElevenLabs ${res.status}: could not get a signed URL.` };
+    return { ok: true, data: { signedUrl: data.signed_url } };
+  } catch {
+    return { ok: false, error: "Could not reach ElevenLabs." };
+  }
+}
+
+chrome.runtime.onMessage.addListener(
+  (req: LlmRequest | LibrarianRequest | WakeRequest | VoiceSignedUrlRequest, _sender, sendResponse) => {
+    if (req?.type === "wake") { sendResponse({ ok: true }); return false; }
+    if (req?.type === "llm") { handle(req as LlmRequest).then(sendResponse); return true; }
+    if (req?.type === "librarian") { sendToLibrarian(req as LibrarianRequest).then(sendResponse); return true; }
+    if (req?.type === "voice-signed-url") { getVoiceSignedUrl().then(sendResponse); return true; }
+    return undefined;
+  },
+);
 
 function notifyYouTubeTab(tabId: number, url: string | undefined, reason: string) {
   if (!url) return;

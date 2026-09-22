@@ -8,9 +8,10 @@
     "build": "node scripts/vite.mjs build",
     "typecheck": "tsc --noEmit",
     "preview": "node scripts/vite.mjs preview",
-    "test": "node --test scripts/build.test.mjs scripts/settings.test.mjs"
+    "test": "node --test scripts/build.test.mjs scripts/settings.test.mjs && node --experimental-strip-types src/core.test.ts"
   },
   "dependencies": {
+    "@elevenlabs/client": "^1.25.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

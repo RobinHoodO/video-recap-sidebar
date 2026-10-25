@@ -27,7 +27,13 @@ export const DEFAULT_GEMINI_PROMPT =
 // Build-time defaults, baked in by Vite from the gitignored .env so keys/secrets
 // survive a full "Remove + Load unpacked" (which wipes chrome.storage). Stored
 // settings still override these, so editing a value in ⚙ persists as normal.
-const ENV = import.meta.env as Record<string, string | undefined>;
+// ponytail: `?? {}` guards plain-node imports (e.g. this file's own test),
+// where import.meta.env isn't injected the way Vite injects it at build time.
+const ENV = (import.meta.env ?? {}) as Record<string, string | undefined>;
+
+// Not a text-LLM provider — kept separate from the Settings provider list.
+export const ELEVENLABS_API_KEY = ENV.VITE_ELEVENLABS_API_KEY ?? "";
+export const ELEVENLABS_AGENT_ID = ENV.VITE_ELEVENLABS_AGENT_ID ?? "";
 export const DEFAULT_SETTINGS: Settings = {
   focus: "Insightful",
   format: "List",
@@ -549,6 +555,20 @@ export function parseTime(t: string): number {
 
 export function transcriptToText(segs: Segment[]): string {
   return segs.map((s) => `[${fmtTime(s.tStartMs)}] ${s.text}`).join("\n");
+}
+
+// ponytail: ElevenLabs dynamic-variable size ceiling — keeps the voice agent's
+// prompt context bounded. Raise if the agent starts truncating relevant detail.
+export const VOICE_TRANSCRIPT_CHAR_CAP = 60_000;
+
+// Formats a transcript for the voice agent's dynamic variables, capping length.
+// Over the cap, keeps the start and end and marks the gap so the agent knows
+// context was cut rather than silently missing it.
+export function buildVoiceTranscript(segs: Segment[]): string {
+  const full = transcriptToText(segs);
+  if (full.length <= VOICE_TRANSCRIPT_CHAR_CAP) return full;
+  const half = Math.floor((VOICE_TRANSCRIPT_CHAR_CAP - 20) / 2);
+  return `${full.slice(0, half)}\n...[truncated]...\n${full.slice(full.length - half)}`;
 }
 
 // ── LLM result types ─────────────────────────────────────────────────────────

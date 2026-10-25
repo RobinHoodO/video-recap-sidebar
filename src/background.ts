@@ -2,8 +2,6 @@
 // sends a transcript + kind; we load settings, call the provider, return data.
 import {
   DEFAULT_SETTINGS,
-  ELEVENLABS_AGENT_ID,
-  ELEVENLABS_API_KEY,
   LIBRARIAN_WEBHOOK_URL,
   buildPrompt,
   callLLM,
@@ -13,6 +11,11 @@ import {
   type SummaryResult,
   type TimestampedResult,
 } from "./core";
+
+// Read here, not in core.ts: core.ts is bundled into the youtube.com content
+// script, and the ElevenLabs key must only ever live in the service worker.
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY ?? "";
+const ELEVENLABS_AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID ?? "";
 
 type LlmRequest = { type: "llm"; kind: LlmKind; transcript: string; question?: string };
 type LibrarianRequest = { type: "librarian"; title: string; url: string; text: string; selection?: string };

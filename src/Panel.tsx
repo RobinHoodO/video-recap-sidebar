@@ -207,7 +207,9 @@ export default function Panel({ segments, transcriptError, videoId, videoTitle, 
   const startVoiceSession = async (): Promise<Conversation> => {
     const r = await sendToWorker<{ ok: true; data: { signedUrl: string } } | { ok: false; error: string }>({ type: "voice-signed-url" });
     if (!r?.ok) throw new Error(r?.error || "Could not start the voice call.");
-    const summaryText = summary.data?.bullets?.map((b) => `${b.emoji} ${b.text}`).join("\n") ?? "";
+    const summaryText = summary.data?.bullets
+      ?.map((b) => [b.emoji, (b.text ?? "").replace(/<\/?hl>/g, "")].filter(Boolean).join(" "))
+      .join("\n") ?? "";
     return Conversation.startSession({
       signedUrl: r.data.signedUrl,
       // YouTube's CSP blocks the SDK's default blob:/data: worklet loads;

@@ -19,6 +19,6 @@ const demoSegments: Segment[] = [
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Panel segments={demoSegments} videoId="preview" />
+    <Panel segments={demoSegments} videoId="preview" videoTitle="Demo video" videoChannel="Demo channel" />
   </StrictMode>
 );
